@@ -243,7 +243,7 @@ export default function BPage() {
                 </div>
               ))}
 
-              {/* 客戶 Logo 層 */}
+              {/* 客戶 Logo 層（可拖曳） */}
               {logoUrl && (
                 <img
                   ref={logoRef}
@@ -258,33 +258,50 @@ export default function BPage() {
                     cursor: dragging ? "grabbing" : "grab",
                     zIndex: 50,
                     userSelect: "none",
+                    pointerEvents: "auto",
                   }}
                   onMouseDown={(e) => {
+                    e.preventDefault();
                     setDragging(true);
-                    const rect = e.currentTarget.getBoundingClientRect();
+
+                    // 修正 scale 比例：實際像素 = 事件位置 / scale
+                    const rect = canvasRef.current!.getBoundingClientRect();
+                    const realX = (e.clientX - rect.left) / scale;
+                    const realY = (e.clientY - rect.top) / scale;
+
                     setOffset({
-                      x: e.clientX - rect.left,
-                      y: e.clientY - rect.top,
+                      x: realX - logoPos.x,
+                      y: realY - logoPos.y,
                     });
+
+                    // 綁定全域事件
+                    const onMove = (ev: MouseEvent) => {
+                      if (!dragging) return;
+                      const rx = (ev.clientX - rect.left) / scale;
+                      const ry = (ev.clientY - rect.top) / scale;
+                      setLogoPos((o) => ({
+                        ...o,
+                        x: rx - offset.x,
+                        y: ry - offset.y,
+                      }));
+                    };
+                    const onUp = () => setDragging(false);
+
+                    window.addEventListener("mousemove", onMove);
+                    window.addEventListener("mouseup", onUp, { once: true });
+
+                    // 清理
+                    window.addEventListener(
+                      "mouseup",
+                      () => {
+                        window.removeEventListener("mousemove", onMove);
+                      },
+                      { once: true }
+                    );
                   }}
-                  onMouseMove={(e) => {
-                    if (!dragging) return;
-                    setLogoPos((o) => ({
-                      ...o,
-                      x:
-                        e.clientX -
-                        offset.x -
-                        canvasRef.current!.getBoundingClientRect().left,
-                      y:
-                        e.clientY -
-                        offset.y -
-                        canvasRef.current!.getBoundingClientRect().top,
-                    }));
-                  }}
-                  onMouseUp={() => setDragging(false)}
-                  onMouseLeave={() => setDragging(false)}
                 />
               )}
+
             </div>
           </div>
 
