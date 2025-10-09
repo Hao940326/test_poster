@@ -422,7 +422,7 @@ export default function BPage() {
           {/* STEP2.5 上傳 LOGO */}
           <div className="mb-6">
             <div className="inline-block text-xs bg-black text-white px-3 py-1 rounded-full mb-2">
-              上傳 LOGO（可拖曳與縮放）
+              上傳 LOGO（可拖曳、縮放、刪除、方向鍵微調）
             </div>
             <input
               type="file"
@@ -435,24 +435,66 @@ export default function BPage() {
                 reader.readAsDataURL(file);
               }}
             />
+
             {logoUrl && (
-              <div className="mt-2 flex items-center gap-2">
-                <label className="text-sm">大小：</label>
-                <input
-                  type="range"
-                  min="40"
-                  max="300"
-                  value={logoPos.size}
-                  onChange={(e) =>
-                    setLogoPos((o) => ({ ...o, size: +e.target.value }))
-                  }
-                />
-                <span className="text-xs text-slate-500">
-                  {logoPos.size}px
-                </span>
+              <div className="mt-3 space-y-3">
+                {/* 大小調整 */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm">大小：</label>
+                  <input
+                    type="range"
+                    min="40"
+                    max="300"
+                    value={logoPos.size}
+                    onChange={(e) =>
+                      setLogoPos((o) => ({ ...o, size: +e.target.value }))
+                    }
+                  />
+                  <span className="text-xs text-slate-500">
+                    {logoPos.size}px
+                  </span>
+                </div>
+
+                {/* 位置微調（方向鍵） */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">位置：</span>
+                  <button
+                    onClick={() => setLogoPos((o) => ({ ...o, y: o.y - 1 }))}
+                    className="px-2 py-1 border rounded"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => setLogoPos((o) => ({ ...o, y: o.y + 1 }))}
+                    className="px-2 py-1 border rounded"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => setLogoPos((o) => ({ ...o, x: o.x - 1 }))}
+                    className="px-2 py-1 border rounded"
+                  >
+                    ←
+                  </button>
+                  <button
+                    onClick={() => setLogoPos((o) => ({ ...o, x: o.x + 1 }))}
+                    className="px-2 py-1 border rounded"
+                  >
+                    →
+                  </button>
+                </div>
+
+                {/* 刪除按鈕 */}
+                <button
+                  onClick={() => setLogoUrl(null)}
+                  className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
+                >
+                  刪除 Logo
+                </button>
               </div>
             )}
           </div>
+
 
           {/* STEP3 下載 PDF */}
           <div>
