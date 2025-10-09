@@ -65,12 +65,9 @@ export default function BPage() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [themeIdx, setThemeIdx] = useState<number>(0);
 
-  // === logo 狀態 ===
+  // === LOGO 狀態 ===
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoPos, setLogoPos] = useState({ x: 50, y: 50, size: 120 });
-  const logoRef = useRef<HTMLImageElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   /* ---------------- 初次載入 ---------------- */
   useEffect(() => {
@@ -172,6 +169,56 @@ export default function BPage() {
   const MAX_PREVIEW_WIDTH = 420;
   const scale = Math.min(MAX_PREVIEW_WIDTH / w, 1);
 
+  // 拖曳共用：把滑鼠/觸控座標 -> 海報原始 px（校正 scale）
+  const getStagePoint = (clientX: number, clientY: number) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left) / scale,
+      y: (clientY - rect.top) / scale,
+    };
+  };
+
+  const startDragLogo = (startX: number, startY: number) => {
+    // 以目前點擊位置與 logo 左上角差值作為 offset
+    const offX = startX - logoPos.x;
+    const offY = startY - logoPos.y;
+
+    const onMove = (cx: number, cy: number) => {
+      const { x, y } = getStagePoint(cx, cy);
+      // 邊界限制：不超出舞台（以 logo 寬度粗略限制）
+      const maxX = Math.max(0, w - logoPos.size);
+      const maxY = Math.max(0, h - logoPos.size);
+      setLogoPos((o) => ({
+        ...o,
+        x: Math.max(0, Math.min(x - offX, maxX)),
+        y: Math.max(0, Math.min(y - offY, maxY)),
+      }));
+    };
+
+    const onMouseMove = (e: MouseEvent) => onMove(e.clientX, e.clientY);
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+
+    // 觸控
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      onMove(t.clientX, t.clientY);
+    };
+    const onTouchEnd = () => {
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
+    };
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd, { passive: false });
+    window.addEventListener("touchcancel", onTouchEnd, { passive: false });
+  };
+
   /* ---------------- Render ---------------- */
   return (
     <div className="min-h-screen bg-white p-6">
@@ -243,65 +290,39 @@ export default function BPage() {
                 </div>
               ))}
 
-              {/* 客戶 Logo 層（可拖曳） */}
+              {/* 客戶 LOGO 層（滑鼠 + 觸控可拖曳） */}
               {logoUrl && (
                 <img
-                  ref={logoRef}
                   src={logoUrl}
                   alt="Logo"
+                  draggable={false}
+                  onDragStart={(e) => e.preventDefault()}
                   style={{
                     position: "absolute",
                     left: logoPos.x,
                     top: logoPos.y,
                     width: logoPos.size,
                     height: "auto",
-                    cursor: dragging ? "grabbing" : "grab",
+                    cursor: "grab",
                     zIndex: 50,
                     userSelect: "none",
                     pointerEvents: "auto",
                   }}
+                  // 滑鼠拖曳
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    setDragging(true);
-
-                    // 修正 scale 比例：實際像素 = 事件位置 / scale
-                    const rect = canvasRef.current!.getBoundingClientRect();
-                    const realX = (e.clientX - rect.left) / scale;
-                    const realY = (e.clientY - rect.top) / scale;
-
-                    setOffset({
-                      x: realX - logoPos.x,
-                      y: realY - logoPos.y,
-                    });
-
-                    // 綁定全域事件
-                    const onMove = (ev: MouseEvent) => {
-                      if (!dragging) return;
-                      const rx = (ev.clientX - rect.left) / scale;
-                      const ry = (ev.clientY - rect.top) / scale;
-                      setLogoPos((o) => ({
-                        ...o,
-                        x: rx - offset.x,
-                        y: ry - offset.y,
-                      }));
-                    };
-                    const onUp = () => setDragging(false);
-
-                    window.addEventListener("mousemove", onMove);
-                    window.addEventListener("mouseup", onUp, { once: true });
-
-                    // 清理
-                    window.addEventListener(
-                      "mouseup",
-                      () => {
-                        window.removeEventListener("mousemove", onMove);
-                      },
-                      { once: true }
-                    );
+                    const p = getStagePoint(e.clientX, e.clientY);
+                    startDragLogo(p.x, p.y);
+                  }}
+                  // 觸控拖曳
+                  onTouchStart={(e) => {
+                    const t = e.touches[0];
+                    if (!t) return;
+                    const p = getStagePoint(t.clientX, t.clientY);
+                    startDragLogo(p.x, p.y);
                   }}
                 />
               )}
-
             </div>
           </div>
 
