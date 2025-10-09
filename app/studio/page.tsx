@@ -9,57 +9,109 @@ import {
 } from "@/lib/dbApi";
 
 /* ------------------- 🔐 登入頂欄（只留 Google） ------------------- */
-function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: any|null)=>void }) {
-  const [user, setUser] = React.useState<any>(null);
-  const [msg, setMsg] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const u = data.user ?? null;
-      setUser(u);
-      onUser(u);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      onUser(u);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, [supabase, onUser]);
+  function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: any|null)=>void }) {
+    const [user, setUser] = React.useState<any>(null);
+    const [msg, setMsg] = React.useState<string | null>(null);
 
-  async function loginGoogle() {
-    const redirect = "/studio";
-    const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+    React.useEffect(() => {
+      let unsub = () => {};
+      // 用同步函式包住 async，確保 cleanup 能正確返回
+      const run = async () => {
+        // 1) 先抓 session
+        const { data: { session } } = await supabase.auth.getSession();
+        const u = session?.user ?? null;
+        setUser(u);
+        onUser(u);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: { prompt: "select_account" },
-      },
-    });
-    if (error) setMsg(error.message);
+        // 2) 檢查 allowed_users —— ❗只要「查不到」或「錯誤」，都視為拒絕
+        if (u?.email) {
+          const email = u.email.toLowerCase();
+          const { data, error } = await supabase
+            .from("allowed_users")
+            .select("email")
+            .eq("email", email)
+            .maybeSingle();
+
+          if (error || !data) {
+            // 👉 這裡與原本不同：出錯也當不允許
+            await supabase.auth.signOut();
+            if (typeof window !== "undefined") {
+              localStorage.setItem(
+                "denied_reason",
+                error ? `allowed_users 查詢失敗：${error.message}` : `不在允許名單：${email}`
+              );
+              window.location.href = "/access-denied";
+            }
+            return; // 直接結束，不要往下訂閱
+          }
+        }
+
+        // 3) 訂閱登入狀態變化
+        const { data: sub } = supabase.auth.onAuthStateChange(async (_evt, session) => {
+          const u2 = session?.user ?? null;
+          setUser(u2);
+          onUser(u2);
+
+          if (!u2?.email) return;
+
+          const email2 = u2.email.toLowerCase();
+          const { data, error } = await supabase
+            .from("allowed_users")
+            .select("email")
+            .eq("email", email2)
+            .maybeSingle();
+
+          // 👉 同樣：出錯或查不到 = 拒絕
+          if (error || !data) {
+            await supabase.auth.signOut();
+            if (typeof window !== "undefined") {
+              localStorage.setItem(
+                "denied_reason",
+                error ? `allowed_users 查詢失敗：${error.message}` : `不在允許名單：${email2}`
+              );
+              window.location.href = "/access-denied";
+            }
+          }
+        });
+
+        unsub = () => sub.subscription.unsubscribe();
+      };
+
+      run();
+      return () => unsub();
+    }, [supabase, onUser]);
+
+    async function loginGoogle() {
+      const redirect = "/studio";
+      const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo, queryParams: { prompt: "select_account" } },
+      });
+      if (error) setMsg(error.message);
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+      setMsg(null);
+    }
+
+    return (
+      <div className="flex items-center gap-3">
+        {user ? (
+          <>
+            <span className="text-sm text-slate-600">已登入：<b>{user.email ?? user.id}</b></span>
+            <button className="px-3 py-1.5 rounded border" onClick={logout}>登出</button>
+          </>
+        ) : (
+          <button className="px-3 py-1.5 rounded border" onClick={loginGoogle}>Google 登入</button>
+        )}
+        {msg && <span className="text-xs text-slate-500">{msg}</span>}
+      </div>
+    );
   }
 
-  async function logout() {
-    await supabase.auth.signOut();
-    setMsg(null);
-  }
-
-  return (
-    <div className="flex items-center gap-3">
-      {user ? (
-        <>
-          <span className="text-sm text-slate-600">已登入：<b>{user.email ?? user.id}</b></span>
-          <button className="px-3 py-1.5 rounded border" onClick={logout}>登出</button>
-        </>
-      ) : (
-        <button className="px-3 py-1.5 rounded border" onClick={loginGoogle}>Google 登入</button>
-      )}
-      {msg && <span className="text-xs text-slate-500">{msg}</span>}
-    </div>
-  );
-}
 
 /* ------------------- 🔧 小工具 ------------------- */
 // File → DataURL
@@ -548,7 +600,8 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
           <button
             className="w-full px-3 py-2 rounded-xl shadow bg-indigo-600 text-white"
             onClick={() => {
-              window.location.href = "http://localhost:3000/edit";
+              window.location.href = "https://test-poster-7dyz.vercel.app/edit";//雲端
+              //window.location.href = "http://localhost:3000/edit";//本機
             }}
           >
             前往 B 端頁面
