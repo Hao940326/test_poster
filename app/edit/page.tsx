@@ -63,9 +63,16 @@ export default function BPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [themeIdx, setThemeIdx] = useState<number>(0); // 三種樣板覆蓋
+  const [themeIdx, setThemeIdx] = useState<number>(0);
 
-  // 初次載入清單
+  // === logo 狀態 ===
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoPos, setLogoPos] = useState({ x: 50, y: 50, size: 120 });
+  const logoRef = useRef<HTMLImageElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+
+  /* ---------------- 初次載入 ---------------- */
   useEffect(() => {
     (async () => {
       try {
@@ -77,12 +84,11 @@ export default function BPage() {
           width: r.width,
           height: r.height,
           bg_path: r.bg_path,
-          // 若表裡沒有 icon_path，就依名稱推導一個
           icon_path: r.icon_path ?? `icons/icon-${safeKey(r.name)}.png`,
           text_layers: r.text_layers,
         }));
         setTemplates(mapped);
-        if (mapped.length > 0) selectTemplate(mapped[0]); // 預設選第一個
+        if (mapped.length > 0) selectTemplate(mapped[0]);
       } finally {
         setLoading(false);
       }
@@ -94,7 +100,6 @@ export default function BPage() {
     const path = t.icon_path!;
     const { data } = supabase.storage
       .from("poster-assets")
-      // 中文路徑需要 encodeURI
       .getPublicUrl(encodeURI(path));
     return data?.publicUrl ?? placeholder;
   }
@@ -113,6 +118,7 @@ export default function BPage() {
     setValues((o) => ({ ...o, [hit.id]: text }));
   }
 
+  /* ---------------- 下載 PDF ---------------- */
   async function downloadPDF() {
     if (!canvasRef.current || !picked) return;
     const html2canvas = (await import("html2canvas")).default;
@@ -120,12 +126,9 @@ export default function BPage() {
 
     const w = picked.width;
     const h = picked.height;
-
-    // 直接指向有 transform 的舞台節點
     const stage = canvasRef.current.querySelector<HTMLDivElement>("[data-stage]");
     if (!stage) return;
 
-    // 重要：在 clone 的 DOM 上把 transform 拿掉，恢復原始 px 尺寸再截圖
     const canvas = await html2canvas(stage, {
       scale: 3,
       useCORS: true,
@@ -139,8 +142,8 @@ export default function BPage() {
       onclone: (doc) => {
         const cloned = doc.querySelector("[data-stage]") as HTMLElement | null;
         if (cloned) {
-          cloned.style.transform = "none";           // ← 移除縮放
-          cloned.style.transformOrigin = "top left"; // 保險
+          cloned.style.transform = "none";
+          cloned.style.transformOrigin = "top left";
           cloned.style.width = `${w}px`;
           cloned.style.height = `${h}px`;
         }
@@ -148,8 +151,6 @@ export default function BPage() {
     });
 
     const imgData = canvas.toDataURL("image/png", 1.0);
-
-    // A4 PDF，等比置中
     const pdf = new jsPDF({ orientation: "p", unit: "px", format: "a4" });
     pdf.internal.scaleFactor = 1;
 
@@ -165,13 +166,13 @@ export default function BPage() {
     pdf.save(`${picked.name}-A4.pdf`);
   }
 
-
-  /* ---- 預覽縮放（不改原始 px） ---- */
+  /* ---------------- 預覽尺寸 ---------------- */
   const w = picked?.width ?? 1080;
   const h = picked?.height ?? 1528;
-  const MAX_PREVIEW_WIDTH = 420; // 依需求可調
-  const scale = Math.min(MAX_PREVIEW_WIDTH / w, 1); // 只縮小不放大
+  const MAX_PREVIEW_WIDTH = 420;
+  const scale = Math.min(MAX_PREVIEW_WIDTH / w, 1);
 
+  /* ---------------- Render ---------------- */
   return (
     <div className="min-h-screen bg-white p-6">
       <div className="grid grid-cols-12 gap-8">
@@ -183,13 +184,11 @@ export default function BPage() {
             </div>
           </div>
 
-          {/* 外層 wrapper 決定呈現大小 */}
           <div
             className="relative mx-auto shadow rounded overflow-hidden bg-white"
             style={{ width: Math.round(w * scale), height: Math.round(h * scale) }}
             ref={canvasRef}
           >
-            {/* 內層 stage 維持原始 px，整個被 scale */}
             <div
               data-stage
               className="absolute top-0 left-0"
@@ -205,7 +204,7 @@ export default function BPage() {
                 backgroundPosition: "center",
               }}
             >
-              {/* 顏色樣板覆蓋（在文字之下） */}
+              {/* 顏色樣板覆蓋 */}
               {themeIdx > 0 && (
                 <div
                   className="absolute inset-0 pointer-events-none mix-blend-multiply"
@@ -218,7 +217,7 @@ export default function BPage() {
                 />
               )}
 
-              {/* 文字層（原始 px） */}
+              {/* 文字層 */}
               {picked?.text_layers.map((L) => (
                 <div
                   key={L.id}
@@ -243,10 +242,53 @@ export default function BPage() {
                   {values[L.id] !== undefined ? values[L.id] : L.text}
                 </div>
               ))}
+
+              {/* 客戶 Logo 層 */}
+              {logoUrl && (
+                <img
+                  ref={logoRef}
+                  src={logoUrl}
+                  alt="Logo"
+                  style={{
+                    position: "absolute",
+                    left: logoPos.x,
+                    top: logoPos.y,
+                    width: logoPos.size,
+                    height: "auto",
+                    cursor: dragging ? "grabbing" : "grab",
+                    zIndex: 50,
+                    userSelect: "none",
+                  }}
+                  onMouseDown={(e) => {
+                    setDragging(true);
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setOffset({
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top,
+                    });
+                  }}
+                  onMouseMove={(e) => {
+                    if (!dragging) return;
+                    setLogoPos((o) => ({
+                      ...o,
+                      x:
+                        e.clientX -
+                        offset.x -
+                        canvasRef.current!.getBoundingClientRect().left,
+                      y:
+                        e.clientY -
+                        offset.y -
+                        canvasRef.current!.getBoundingClientRect().top,
+                    }));
+                  }}
+                  onMouseUp={() => setDragging(false)}
+                  onMouseLeave={() => setDragging(false)}
+                />
+              )}
             </div>
           </div>
 
-          {/* 選擇設計樣板（三格） */}
+          {/* 設計樣板選擇 */}
           <div className="mt-4">
             <div className="inline-block text-xs bg-black text-white px-3 py-1 rounded-full mb-2">
               選擇設計樣板
@@ -276,7 +318,7 @@ export default function BPage() {
 
         {/* 右：操作區 */}
         <div className="col-span-7">
-          {/* STEP1 選擇課程（icon 列） */}
+          {/* STEP1 選擇課程 */}
           <div className="mb-6">
             <div className="inline-block text-xs bg-black text-white px-3 py-1 rounded-full mb-2">
               選擇課程
@@ -302,9 +344,7 @@ export default function BPage() {
                         className="w-14 h-14 object-cover rounded mb-1"
                         alt={t.name}
                       />
-                      <span className="text-[11px] text-slate-700">
-                        {t.name}
-                      </span>
+                      <span className="text-[11px] text-slate-700">{t.name}</span>
                     </button>
                   );
                 })}
@@ -312,12 +352,11 @@ export default function BPage() {
             )}
           </div>
 
-          {/* STEP2 輸入文字資訊 */}
+          {/* STEP2 輸入文字 */}
           <div className="mb-6">
             <div className="inline-block text-xs bg-black text-white px-3 py-1 rounded-full mb-2">
               輸入文字
             </div>
-
             <div className="space-y-3">
               {FIELD_KEYS.map(({ key, match, label }) => (
                 <div key={key} className="flex items-center gap-3">
@@ -340,6 +379,41 @@ export default function BPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* STEP2.5 上傳 LOGO */}
+          <div className="mb-6">
+            <div className="inline-block text-xs bg-black text-white px-3 py-1 rounded-full mb-2">
+              上傳 LOGO（可拖曳與縮放）
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setLogoUrl(reader.result as string);
+                reader.readAsDataURL(file);
+              }}
+            />
+            {logoUrl && (
+              <div className="mt-2 flex items-center gap-2">
+                <label className="text-sm">大小：</label>
+                <input
+                  type="range"
+                  min="40"
+                  max="300"
+                  value={logoPos.size}
+                  onChange={(e) =>
+                    setLogoPos((o) => ({ ...o, size: +e.target.value }))
+                  }
+                />
+                <span className="text-xs text-slate-500">
+                  {logoPos.size}px
+                </span>
+              </div>
+            )}
           </div>
 
           {/* STEP3 下載 PDF */}
