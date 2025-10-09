@@ -1,17 +1,14 @@
-"use client";
+// app/login/page.tsx
+import { Suspense } from "react";
+import LoginBody from "./LoginBody";
 
-import { useSearchParams } from "next/navigation";
-import React from "react";
+// 讓這頁不要做預先靜態匯出，避免 CSR bailout 檢查
+export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
-  const params = useSearchParams();
-  const err = params.get("err");
-
+export default function Page() {
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold mb-2">登入頁面</h1>
-      {err && <p style={{ color: "red" }}>錯誤：{err}</p>}
-      {/* 你的登入按鈕區塊 */}
-    </div>
+    <Suspense fallback={<p style={{ padding: 16 }}>Loading…</p>}>
+      <LoginBody />
+    </Suspense>
   );
 }
