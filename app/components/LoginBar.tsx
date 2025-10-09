@@ -1,8 +1,16 @@
+"use client"; // ⚠️ 必須放在整個檔案第一行！
+
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import React from "react";
 
-function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: any|null)=>void }) {
+function LoginBar({
+  supabase,
+  onUser,
+}: {
+  supabase: SupabaseClient;
+  onUser: (u: any | null) => void;
+}) {
   const [user, setUser] = React.useState<any>(null);
   const [msg, setMsg] = React.useState<string | null>(null);
   const router = useRouter();
@@ -27,7 +35,9 @@ function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: 
 
   async function loginGoogle() {
     const redirect = "/studio";
-    const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+    const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(
+      redirect
+    )}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo, queryParams: { prompt: "select_account" } },
@@ -44,13 +54,21 @@ function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: 
     <div className="flex items-center gap-3">
       {user ? (
         <>
-          <span className="text-sm text-slate-600">已登入：<b>{user.email ?? user.id}</b></span>
-          <button className="px-3 py-1.5 rounded border" onClick={logout}>登出</button>
+          <span className="text-sm text-slate-600">
+            已登入：<b>{user.email ?? user.id}</b>
+          </span>
+          <button className="px-3 py-1.5 rounded border" onClick={logout}>
+            登出
+          </button>
         </>
       ) : (
-        <button className="px-3 py-1.5 rounded border" onClick={loginGoogle}>Google 登入</button>
+        <button className="px-3 py-1.5 rounded border" onClick={loginGoogle}>
+          Google 登入
+        </button>
       )}
       {msg && <span className="text-xs text-slate-500">{msg}</span>}
     </div>
   );
 }
+
+export default LoginBar;
