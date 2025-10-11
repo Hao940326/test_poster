@@ -55,17 +55,16 @@ const FIELD_KEYS = [
   { key: "addr", match: /地址|地點|address|上課地點/i, label: "上課地址：" },
 ] as const;
 
+
 /* 分類頭標籤顏色（接近稿面） */
-const CATEGORY_STYLES: Record<
-  string,
-  { dot: string; pill: string }
-> = {
-  "創意手作": { dot: "bg-rose-300", pill: "bg-rose-400 text-white" },
-  "金智挑戰": { dot: "bg-amber-300", pill: "bg-amber-400 text-white" },
-  "STEAM啟航": { dot: "bg-sky-300", pill: "bg-sky-500 text-white" },
-  "律動節奏": { dot: "bg-fuchsia-300", pill: "bg-fuchsia-500 text-white" },
-  其他: { dot: "bg-slate-300", pill: "bg-slate 500 text-white" },
+const CATEGORY_STYLES: Record<string, { dot: string; pill: string }> = {
+  "創意手作": { dot: "bg-[#F2A7AF]", pill: "bg-[#F2A7AF] text-white" },
+  "金智挑戰": { dot: "bg-[#EFAB67]", pill: "bg-[#EFAB67] text-white" },
+  "STEAM啟航": { dot: "bg-[#799DBF]", pill: "bg-[#799DBF] text-white" },
+  "律動節奏": { dot: "bg-[#D389C2]", pill: "bg-[#D389C2] text-white" },
+  其他: { dot: "bg-slate-300", pill: "bg-slate-500 text-white" },
 };
+
 
 /* 用名稱猜分類（若 A 端有存真正的 category 可替換這邏輯） */
 function guessCategory(name: string): string {
@@ -263,9 +262,10 @@ export default function BPage() {
         {/* 左：預覽區 */}
         <div className="col-span-5">
           <div className="mb-3 inline-flex items-center gap-2">
-            <span className="text-[13px] font-bold tracking-widest bg-amber-300 text-black px-4 py-1 rounded-full shadow">
+            <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               海報預覽
             </span>
+
           </div>
 
           <div
@@ -468,9 +468,10 @@ export default function BPage() {
         <div className="col-span-7">
           {/* 選擇課程（分類群組 + icon 格） */}
           <div className="mb-6">
-            <span className="text-[13px] font-bold tracking-widest px-4 py-1 rounded-full bg-amber-300 shadow mr-2">
+            <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               選擇課程
             </span>
+
 
             <div className="mt-4 space-y-6">
               {loading ? (
@@ -499,20 +500,17 @@ export default function BPage() {
                             <button
                               key={t.id}
                               onClick={() => selectTemplate(t)}
-                              className={`w-[78px] p-2 rounded-xl border hover:shadow transition flex flex-col items-center ${
-                                active ? "ring-2 ring-slate-900" : ""
+                              className={`w-[80px] h-[80px] p-1 rounded-xl border hover:shadow transition flex items-center justify-center ${
+                                picked?.id === t.id ? "ring-2 ring-slate-900" : ""
                               }`}
                               title={t.name}
                             >
                               <img
                                 src={iconUrl}
                                 onError={(e) => ((e.currentTarget.src = placeholder))}
-                                className="w-12 h-12 object-cover rounded mb-1"
+                                className="w-[64px] h-[64px] object-contain"
                                 alt={t.name}
                               />
-                              <span className="text-[11px] text-slate-700 text-center leading-tight">
-                                {t.name}
-                              </span>
                             </button>
                           );
                         })}
@@ -526,9 +524,10 @@ export default function BPage() {
 
           {/* 輸入資訊四欄 */}
           <div className="mb-6">
-            <span className="text-[13px] font-bold tracking-widest px-4 py-1 rounded-full bg-amber-300 shadow">
+            <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               輸入資訊
             </span>
+
 
             <div className="mt-4 space-y-3">
               {FIELD_KEYS.map(({ key, match, label }) => (
