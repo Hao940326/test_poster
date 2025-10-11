@@ -64,7 +64,7 @@ const CATEGORY_STYLES: Record<
   "金智挑戰": { dot: "bg-amber-300", pill: "bg-amber-400 text-white" },
   "STEAM啟航": { dot: "bg-sky-300", pill: "bg-sky-500 text-white" },
   "律動節奏": { dot: "bg-fuchsia-300", pill: "bg-fuchsia-500 text-white" },
-  其他: { dot: "bg-slate-300", pill: "bg-slate-500 text-white" },
+  其他: { dot: "bg-slate-300", pill: "bg-slate 500 text-white" },
 };
 
 /* 用名稱猜分類（若 A 端有存真正的 category 可替換這邏輯） */
