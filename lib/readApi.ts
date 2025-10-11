@@ -1,4 +1,3 @@
-// /lib/readApi.ts
 "use client";
 
 import { getSupabase } from "./supabaseClient";

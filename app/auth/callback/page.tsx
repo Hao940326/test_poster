@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabase } from "@/lib/supabaseClient";
+import { guardAllowed } from "@/lib/guardAllowed";
 
 function safeRedirect(u: URL) {
   const r = u.searchParams.get("redirect") || "/studio";
@@ -19,7 +20,7 @@ export default function AuthCallbackPage() {
         const url = new URL(window.location.href);
         const hasCode = !!url.searchParams.get("code");
 
-        // 1) 只有有 code 才換票；否則試 implicit
+        // 1) 只有真的有 ?code=... 才換票；否則試 implicit (#access_token)
         if (hasCode) {
           const { error } = await supabase.auth.exchangeCodeForSession(url.toString());
           if (error) throw error;
@@ -34,29 +35,21 @@ export default function AuthCallbackPage() {
           }
         }
 
-        // 2) 讀使用者
-        const { data: { user } } = await supabase.auth.getUser();
-        const email = user?.email?.toLowerCase() ?? "";
-
-        // 3) 查表：不在名單 → 立刻登出 + 導到拒絕頁
-        const { data, error } = await supabase
-          .from("allowed_users")
-          .select("email")
-          .eq("email", email)
-          .maybeSingle();
-        console.log("[allowed_users result]", { email, data, error });
-        if (error) {
-          console.warn("[allowed_users] query error:", error);
-        }
-        if (!email || !data) {
+        // 2) 名單守門（導頁前一定檢）
+        const { allowed, email } = await guardAllowed(supabase, "callback");
+        if (!allowed) {
           await supabase.auth.signOut();
           localStorage.setItem("denied_reason", email ? `不在允許名單：${email}` : "無法取得 email");
+          console.warn("[callback] denied → /access-denied");
           router.replace("/access-denied");
-          return;
+          return; // 必須 return，避免繼續導回
         }
 
-        // 4) OK → 導回原頁
-        router.replace(safeRedirect(url));
+        // 3) 允許 → 安全導回
+        const to = safeRedirect(url);
+        console.log("[callback] allowed →", to);
+        setMsg("登入成功，導向中…");
+        router.replace(to);
       } catch (e: any) {
         console.error(e);
         setMsg("登入失敗：" + (e?.message ?? String(e)));
