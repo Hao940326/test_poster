@@ -135,6 +135,28 @@ export default function BPage() {
     if (!hit) return;
     setValues((o) => ({ ...o, [hit.id]: text }));
   }
+  // 🔍 依 FIELD_KEYS 的 key 取得目前輸入值（從 values 裡對應出補習班欄位的值）
+  function getFieldValue(fieldKey: typeof FIELD_KEYS[number]["key"]) {
+    if (!picked) return "";
+    const conf = FIELD_KEYS.find((f) => f.key === fieldKey)!;
+    const hit = picked.text_layers.find((l) => conf.match.test(l.label));
+    return hit ? values[hit.id] ?? "" : "";
+  }
+
+  // 🧹 安全檔名（移除特殊符號、空白、表情等）
+  function toSafeFilename(s: string, fallback = "未命名") {
+    s = (s ?? "").replace(/\u3000/g, " ").trim();
+    s = s.replace(/[\\\/:\*\?"<>\|\u0000-\u001F]/g, "");
+    s = s.replace(
+      /[\u{1F000}-\u{1FAFF}\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}]/gu,
+      ""
+    );
+    s = s.replace(/\s+/g, " ");
+    if (!s) s = fallback;
+    if (s.length > 80) s = s.slice(0, 80).trim();
+    return s;
+  }
+
 
   /* ---------------- 下載 PDF ---------------- */
   async function downloadPDF() {
@@ -181,7 +203,13 @@ export default function BPage() {
     const offsetY = (pageH - imgH) / 2;
 
     pdf.addImage(imgData, "PNG", offsetX, offsetY, imgW, imgH, undefined, "FAST");
-    pdf.save(`${picked.name}-A4.pdf`);
+
+    // 直接抓「補習班名稱」欄位目前的輸入值
+    const schoolInput = getFieldValue("school");
+    const courseName = picked?.name ?? "";
+
+    const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(courseName)}.pdf`;
+    pdf.save(fileName);
   }
 
   /* ---------------- 預覽尺寸 ---------------- */
