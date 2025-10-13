@@ -47,6 +47,24 @@ function safeKey(name: string) {
     .toLowerCase();
 }
 
+/** 基底名稱：去尾碼（空白/底線/連字/「款/版」+ 數字），例 AI1、AI-01、AI_2、AI款3 -> AI */
+function baseName(name: string) {
+  if (!name) return "";
+  const half = name.replace(/[０-９]/g, (d) =>
+    String.fromCharCode(d.charCodeAt(0) - 0xfee0)
+  );
+  return half.trim().replace(/(?:[\s_-]*?(?:款|版)?)?\s*[_\- ]*\d+\s*$/u, "");
+}
+
+/** 取名稱尾數字；沒有則回 -1（用於排序讓「無尾碼」排最前） */
+function tailNumber(s: string) {
+  s = s.replace(/[０-９]/g, (d) =>
+    String.fromCharCode(d.charCodeAt(0) - 0xfee0)
+  );
+  const m = s.match(/(\d+)\s*$/);
+  return m ? parseInt(m[1], 10) : -1;
+}
+
 /** 右側四個欄位：用 label 關鍵字自動對應 */
 const FIELD_KEYS = [
   { key: "school", match: /補習班|機構|班名|店名|名稱/i, label: "補習班名稱：" },
@@ -55,8 +73,6 @@ const FIELD_KEYS = [
   { key: "addr", match: /地址|地點|address|上課地點/i, label: "上課地址：" },
 ] as const;
 
-
-/* 分類頭標籤顏色（接近稿面） */
 const CATEGORY_STYLES: Record<string, { dot: string; pill: string }> = {
   "創意手作": { dot: "bg-[#F2A7AF]", pill: "bg-[#F2A7AF] text-white" },
   "金智挑戰": { dot: "bg-[#EFAB67]", pill: "bg-[#EFAB67] text-white" },
@@ -65,14 +81,34 @@ const CATEGORY_STYLES: Record<string, { dot: string; pill: string }> = {
   其他: { dot: "bg-slate-300", pill: "bg-slate-500 text-white" },
 };
 
-
-/* 用名稱猜分類（若 A 端有存真正的 category 可替換這邏輯） */
+/* 用名稱猜分類（之後可改成 DB 欄位） */
 function guessCategory(name: string): string {
-  if (/3D筆|拼豆|黏土|拼豆|水珠|氣球/i.test(name)) return "創意手作";
+  name = baseName(name);
+  if (/3D筆|拼豆|黏土|水珠|氣球/i.test(name)) return "創意手作";
   if (/卡牌|桌遊|魔方|魔術|吸管|骨牌/i.test(name)) return "金智挑戰";
-  if (/機械|科學|昆蟲|科學|AI|積木/i.test(name)) return "STEAM啟航";
+  if (/機械|科學|昆蟲|AI|積木/i.test(name)) return "STEAM啟航";
   if (/疊杯|卡林巴|舞蹈|體適能/i.test(name)) return "律動節奏";
   return "其他";
+}
+
+/** 依基底名分組後，只取每組代表模板（無尾碼優先，其次數字最小） */
+function representativesByBase(list: TemplateRowLite[]) {
+  const buckets = new Map<string, TemplateRowLite[]>();
+  for (const t of list) {
+    const b = baseName(t.name);
+    if (!buckets.has(b)) buckets.set(b, []);
+    buckets.get(b)!.push(t);
+  }
+  const reps: TemplateRowLite[] = [];
+  for (const [, arr] of buckets) {
+    arr.sort((a, b) => {
+      const na = tailNumber(a.name), nb = tailNumber(b.name);
+      if (na === nb) return a.name.localeCompare(b.name, "zh-Hant");
+      return na - nb;
+    });
+    reps.push(arr[0]); // 每組代表
+  }
+  return reps;
 }
 
 /* ---------------- Page ---------------- */
@@ -83,7 +119,6 @@ export default function BPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const stageWrapRef = useRef<HTMLDivElement>(null);
-  const [themeIdx, setThemeIdx] = useState<number>(0);
 
   // === LOGO 狀態 ===
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -122,6 +157,13 @@ export default function BPage() {
     return data?.publicUrl ?? placeholder;
   }
 
+  /** 只用背景圖當縮圖；沒有就顯示 placeholder */
+  function getThumbFromBg(t: TemplateRowLite) {
+    const p = t.bg_path;
+    if (!p) return placeholder;
+    return /^https?:|^data:image\//.test(p) ? p : toPublicUrl(encodeURI(p));
+  }
+
   function selectTemplate(t: TemplateRowLite) {
     setPicked(t);
     const init: Record<string, string> = {};
@@ -135,7 +177,8 @@ export default function BPage() {
     if (!hit) return;
     setValues((o) => ({ ...o, [hit.id]: text }));
   }
-  // 🔍 依 FIELD_KEYS 的 key 取得目前輸入值（從 values 裡對應出補習班欄位的值）
+
+  // 從右側表單抓目前值（對應文字層）
   function getFieldValue(fieldKey: typeof FIELD_KEYS[number]["key"]) {
     if (!picked) return "";
     const conf = FIELD_KEYS.find((f) => f.key === fieldKey)!;
@@ -143,7 +186,7 @@ export default function BPage() {
     return hit ? values[hit.id] ?? "" : "";
   }
 
-  // 🧹 安全檔名（移除特殊符號、空白、表情等）
+  // 安全檔名
   function toSafeFilename(s: string, fallback = "未命名") {
     s = (s ?? "").replace(/\u3000/g, " ").trim();
     s = s.replace(/[\\\/:\*\?"<>\|\u0000-\u001F]/g, "");
@@ -157,7 +200,6 @@ export default function BPage() {
     return s;
   }
 
-
   /* ---------------- 下載 PDF ---------------- */
   async function downloadPDF() {
     if (!stageWrapRef.current || !picked) return;
@@ -166,7 +208,8 @@ export default function BPage() {
 
     const w = picked.width;
     const h = picked.height;
-    const stage = stageWrapRef.current.querySelector<HTMLDivElement>("[data-stage]");
+    const stage =
+      stageWrapRef.current.querySelector<HTMLDivElement>("[data-stage]");
     if (!stage) return;
 
     const canvas = await html2canvas(stage, {
@@ -204,18 +247,19 @@ export default function BPage() {
 
     pdf.addImage(imgData, "PNG", offsetX, offsetY, imgW, imgH, undefined, "FAST");
 
-    // 直接抓「補習班名稱」欄位目前的輸入值
+    // 檔名：補習班名稱 + 基底才藝名
     const schoolInput = getFieldValue("school");
-    const courseName = picked?.name ?? "";
-
-    const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(courseName)}.pdf`;
+    const courseBase = baseName(picked?.name ?? "");
+    const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(
+      courseBase
+    )}.pdf`;
     pdf.save(fileName);
   }
 
   /* ---------------- 預覽尺寸 ---------------- */
   const w = picked?.width ?? 1080;
   const h = picked?.height ?? 1528;
-  const MAX_PREVIEW_WIDTH = 460; // 接近設計稿寬
+  const MAX_PREVIEW_WIDTH = 460;
   const scale = Math.min(MAX_PREVIEW_WIDTH / w, 1);
 
   // 把滑鼠/觸控座標 -> 海報原始 px（校正 scale）
@@ -266,16 +310,29 @@ export default function BPage() {
     window.addEventListener("touchcancel", onTouchEnd, { passive: false });
   };
 
-  /* --------- 將模板依分類群組（符合你的設計稿） --------- */
+  /* --------- 兄弟模板：同系列多樣式（例：AI / AI1 / AI2） --------- */
+  const siblings = useMemo(() => {
+    if (!picked) return [] as TemplateRowLite[];
+    const bn = baseName(picked.name);
+    const same = templates.filter((t) => baseName(t.name) === bn);
+    return same.sort((a, b) => {
+      const na = tailNumber(a.name), nb = tailNumber(b.name);
+      if (na === nb) return a.name.localeCompare(b.name, "zh-Hant");
+      return na - nb; // 無數字(-1) 會排最前
+    });
+  }, [picked, templates]);
+
+  /* --------- 右側選課（只顯示每系列代表） --------- */
   const grouped = useMemo(() => {
+    const reps = representativesByBase(templates);
     const map = new Map<string, TemplateRowLite[]>();
-    for (const t of templates) {
+    for (const t of reps) {
       const cat = guessCategory(t.name);
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(t);
     }
-    // 排序（讓 UI 穩定）
-    for (const v of map.values()) v.sort((a, b) => a.name.localeCompare(b.name));
+    for (const v of map.values())
+      v.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
     const order = ["創意手作", "金智挑戰", "STEAM啟航", "律動節奏", "其他"];
     return order
       .filter((k) => map.has(k))
@@ -285,7 +342,6 @@ export default function BPage() {
   /* ---------------- Render ---------------- */
   return (
     <div className="min-h-screen bg-white">
-      {/* 內容區 */}
       <div className="max-w-[1180px] mx-auto p-8 grid grid-cols-12 gap-10">
         {/* 左：預覽區 */}
         <div className="col-span-5">
@@ -293,7 +349,6 @@ export default function BPage() {
             <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               海報預覽
             </span>
-
           </div>
 
           <div
@@ -310,25 +365,12 @@ export default function BPage() {
                 transform: `scale(${scale})`,
                 transformOrigin: "top left",
                 backgroundImage: picked?.bg_path
-                  ? `url(${toPublicUrl(picked.bg_path)})`
+                  ? `url(${toPublicUrl(encodeURI(picked.bg_path))})`
                   : "none",
                 backgroundSize: "cover",
                 backgroundPosition: "center",
               }}
             >
-              {/* 顏色模板（左下三色）——用一層色罩接近稿面 */}
-              {themeIdx > 0 && (
-                <div
-                  className="absolute inset-0 pointer-events-none mix-blend-multiply"
-                  style={{
-                    background:
-                      themeIdx === 1
-                        ? "linear-gradient(180deg, rgba(255,232,178,.22), rgba(255,205,120,.22))"
-                        : "linear-gradient(180deg, rgba(221,234,255,.22), rgba(185,209,255,.22))",
-                  }}
-                />
-              )}
-
               {/* 文字層 */}
               {picked?.text_layers.map((L) => (
                 <div
@@ -389,124 +431,124 @@ export default function BPage() {
             </div>
           </div>
 
-          {/* 左下：模板色塊 + 上傳 LOGO */}
-          <div className="mt-6 flex items-center gap-6">
-            <div>
-              <div className="text-[13px] mb-2 font-semibold text-slate-700">
-                選擇模板
-              </div>
-              <div className="flex gap-3">
-                {[0, 1, 2].map((i) => (
-                  <button
-                    key={i}
-                    onClick={() => setThemeIdx(i)}
-                    className={`w-14 h-16 rounded-xl shadow border ${
-                      themeIdx === i ? "ring-2 ring-black" : ""
-                    }`}
-                    style={{
-                      background:
-                        i === 0
-                          ? "linear-gradient(#f8f8f8,#f3f3f3)"
-                          : i === 1
-                          ? "linear-gradient(#ffe6b8,#ffc972)"
-                          : "linear-gradient(#e6eaff,#c7d7ff)",
-                    }}
-                    title={`款${i + 1}`}
-                  />
-                ))}
-              </div>
+          {/* 左下：同系列模板切換（縮圖只抓 bg_path） */}
+          <div className="mt-6">
+            <div className="text-[13px] mb-2 font-semibold text-slate-700">
+              選擇模板
             </div>
-
-            <div>
-              <div className="text-[13px] mb-2 font-semibold text-slate-700">
-                上傳LOGO
-              </div>
-              <label className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 grid place-items-center cursor-pointer hover:border-slate-400">
-                <span className="text-2xl">＋</span>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => setLogoUrl(reader.result as string);
-                    reader.readAsDataURL(file);
-                  }}
-                />
-              </label>
+            <div className="flex gap-3">
+              {siblings.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  onClick={() => setPicked(tpl)}
+                  className={`w-14 h-16 rounded-xl shadow border overflow-hidden ${
+                    picked?.id === tpl.id ? "ring-2 ring-black" : ""
+                  }`}
+                  title={tpl.name}
+                >
+                  <img
+                    src={getThumbFromBg(tpl)}
+                    onError={(e) => (e.currentTarget.src = placeholder)}
+                    className="w-full h-full object-cover"
+                    alt={tpl.name}
+                    draggable={false}
+                  />
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* LOGO 微調控制 */}
-          {logoUrl && (
-            <div className="mt-3 space-y-3">
-              <div className="flex items-center gap-2">
-                <label className="text-sm">大小：</label>
-                <input
-                  type="range"
-                  min="40"
-                  max="320"
-                  value={logoPos.size}
-                  onChange={(e) =>
-                    setLogoPos((o) => ({ ...o, size: +e.target.value }))
-                  }
-                />
-                <span className="text-xs text-slate-500">{logoPos.size}px</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm">位置：</span>
-                <button
-                  onClick={() => setLogoPos((o) => ({ ...o, y: o.y - 1 }))}
-                  className="px-2 py-1 border rounded"
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={() => setLogoPos((o) => ({ ...o, y: o.y + 1 }))}
-                  className="px-2 py-1 border rounded"
-                >
-                  ↓
-                </button>
-                <button
-                  onClick={() => setLogoPos((o) => ({ ...o, x: o.x - 1 }))}
-                  className="px-2 py-1 border rounded"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => setLogoPos((o) => ({ ...o, x: o.x + 1 }))}
-                  className="px-2 py-1 border rounded"
-                >
-                  →
-                </button>
-                <button
-                  onClick={() => setLogoUrl(null)}
-                  className="ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
-                >
-                  刪除 Logo
-                </button>
-              </div>
+          {/* 上傳 LOGO */}
+          <div className="mt-6">
+            <div className="text-[13px] mb-2 font-semibold text-slate-700">
+              上傳LOGO
             </div>
-          )}
+            <label className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 grid place-items-center cursor-pointer hover:border-slate-400">
+              <span className="text-2xl">＋</span>
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setLogoUrl(reader.result as string);
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+
+            {logoUrl && (
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm">大小：</label>
+                  <input
+                    type="range"
+                    min="40"
+                    max="320"
+                    value={logoPos.size}
+                    onChange={(e) =>
+                      setLogoPos((o) => ({ ...o, size: +e.target.value }))
+                    }
+                  />
+                  <span className="text-xs text-slate-500">
+                    {logoPos.size}px
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">位置：</span>
+                  <button
+                    onClick={() => setLogoPos((o) => ({ ...o, y: o.y - 1 }))}
+                    className="px-2 py-1 border rounded"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => setLogoPos((o) => ({ ...o, y: o.y + 1 }))}
+                    className="px-2 py-1 border rounded"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => setLogoPos((o) => ({ ...o, x: o.x - 1 }))}
+                    className="px-2 py-1 border rounded"
+                  >
+                    ←
+                  </button>
+                  <button
+                    onClick={() => setLogoPos((o) => ({ ...o, x: o.x + 1 }))}
+                    className="px-2 py-1 border rounded"
+                  >
+                    →
+                  </button>
+                  <button
+                    onClick={() => setLogoUrl(null)}
+                    className="ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
+                  >
+                    刪除 Logo
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 右：選課 + 表單 + 下載 */}
         <div className="col-span-7">
-          {/* 選擇課程（分類群組 + icon 格） */}
+          {/* 選擇課程（分類群組；只顯示代表模板） */}
           <div className="mb-6">
             <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               選擇課程
             </span>
-
 
             <div className="mt-4 space-y-6">
               {loading ? (
                 <div className="text-slate-500">載入中…</div>
               ) : (
                 grouped.map((grp) => {
-                  const s = CATEGORY_STYLES[grp.name] ?? CATEGORY_STYLES["其他"];
+                  const s =
+                    CATEGORY_STYLES[grp.name] ?? CATEGORY_STYLES["其他"];
                   return (
                     <div key={grp.name}>
                       <div className="flex items-center gap-2 mb-2">
@@ -523,21 +565,24 @@ export default function BPage() {
                       <div className="flex flex-wrap gap-3">
                         {grp.items.map((t) => {
                           const iconUrl = getIconUrl(t);
-                          const active = picked?.id === t.id;
                           return (
                             <button
                               key={t.id}
                               onClick={() => selectTemplate(t)}
                               className={`w-[80px] h-[80px] p-1 rounded-xl border hover:shadow transition flex items-center justify-center ${
-                                picked?.id === t.id ? "ring-2 ring-slate-900" : ""
+                                picked?.id === t.id
+                                  ? "ring-2 ring-slate-900"
+                                  : ""
                               }`}
-                              title={t.name}
+                              title={baseName(t.name)}
                             >
                               <img
                                 src={iconUrl}
-                                onError={(e) => ((e.currentTarget.src = placeholder))}
+                                onError={(e) =>
+                                  ((e.currentTarget.src = placeholder))
+                                }
                                 className="w-[64px] h-[64px] object-contain"
-                                alt={t.name}
+                                alt={baseName(t.name)}
                               />
                             </button>
                           );
@@ -555,7 +600,6 @@ export default function BPage() {
             <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               輸入資訊
             </span>
-
 
             <div className="mt-4 space-y-3">
               {FIELD_KEYS.map(({ key, match, label }) => (
@@ -608,8 +652,8 @@ export default function BPage() {
         </div>
       </div>
 
-      {/* 黃色頁尾（版權） */}
-      <footer className="mt-10 bg-amber-400 text-[12px] text-white/90 py-3 text-center tracking-wider">
+      {/* 頁尾 */}
+      <footer className="mt-10 bg-[#FFC840] text-[12px] text-white/90 py-3 text-center tracking-wider">
         國王才藝 KING'S TALENT ｜本平台模板由國王才藝原創設計，僅限才藝機構之招生宣傳使用，請勿轉售、重製或作商業用途。
       </footer>
     </div>
