@@ -36,6 +36,10 @@ type TemplateRowLite = {
 const placeholder =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
+/** ✅ 預設公司 LOGO（請換成你的公開網址） */
+const DEFAULT_LOGO =
+  "data:image/png;base64,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";
+
 function safeKey(name: string) {
   return name
     .trim()
@@ -122,7 +126,12 @@ export default function BPage() {
 
   // === LOGO 狀態 ===
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoPos, setLogoPos] = useState({ x: 60, y: 60, size: 120 });
+  const [logoPos, setLogoPos] = useState({
+    x: 0,
+    y: 0,
+    size: 300, // 預設放大
+  });
+
 
   /* ---------------- 初次載入 ---------------- */
   useEffect(() => {
@@ -140,7 +149,14 @@ export default function BPage() {
           text_layers: r.text_layers,
         }));
         setTemplates(mapped);
-        if (mapped.length > 0) selectTemplate(mapped[0]);
+        // ❌ 不預設選任何模板；只放公司 LOGO
+        setLogoUrl(DEFAULT_LOGO);
+        setLogoPos({
+        x: (1080 - 300) / 2, // 寬度 1080 為預設畫布，logo 寬 300
+        y: (1528 - 300) / 2, // 高度 1528 為預設畫布
+        size: 300,
+      });
+
       } finally {
         setLoading(false);
       }
@@ -166,9 +182,14 @@ export default function BPage() {
 
   function selectTemplate(t: TemplateRowLite) {
     setPicked(t);
+
+    // 文字初始化
     const init: Record<string, string> = {};
     for (const L of t.text_layers) init[L.id] = L.text;
     setValues(init);
+
+    // ✅ 一按模板就把 Logo 隱藏/移除
+    setLogoUrl(null);
   }
 
   function setFieldForLabel(match: RegExp, text: string) {
@@ -202,7 +223,7 @@ export default function BPage() {
 
   /* ---------------- 下載 PDF ---------------- */
   async function downloadPDF() {
-    if (!stageWrapRef.current || !picked) return;
+    if (!stageWrapRef.current || !picked) return; // 未選模板不允許下載
     const html2canvas = (await import("html2canvas")).default;
     const { jsPDF } = await import("jspdf");
 
@@ -371,33 +392,34 @@ export default function BPage() {
                 backgroundPosition: "center",
               }}
             >
-              {/* 文字層 */}
-              {picked?.text_layers.map((L) => (
-                <div
-                  key={L.id}
-                  className="absolute select-none px-1"
-                  style={{
-                    left: L.x,
-                    top: L.y,
-                    width: Math.max(1, L.width),
-                    color: L.color,
-                    fontSize: L.fontSize,
-                    fontWeight: L.weight,
-                    fontStyle: L.italic ? "italic" : "normal",
-                    textAlign: L.align as any,
-                    textTransform: L.uppercase ? "uppercase" : "none",
-                    textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
-                    lineHeight: 1.1,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    zIndex: 10,
-                  }}
-                >
-                  {values[L.id] !== undefined ? values[L.id] : L.text}
-                </div>
-              ))}
+              {/* 文字層：只有選了模板才顯示 */}
+              {picked &&
+                picked.text_layers.map((L) => (
+                  <div
+                    key={L.id}
+                    className="absolute select-none px-1"
+                    style={{
+                      left: L.x,
+                      top: L.y,
+                      width: Math.max(1, L.width),
+                      color: L.color,
+                      fontSize: L.fontSize,
+                      fontWeight: L.weight,
+                      fontStyle: L.italic ? "italic" : "normal",
+                      textAlign: L.align as any,
+                      textTransform: L.uppercase ? "uppercase" : "none",
+                      textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
+                      lineHeight: 1.1,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      zIndex: 10,
+                    }}
+                  >
+                    {values[L.id] !== undefined ? values[L.id] : L.text}
+                  </div>
+                ))}
 
-              {/* LOGO 層（可拖曳/縮放） */}
+              {/* LOGO 層（可拖曳/縮放）— 初次載入會看到 DEFAULT_LOGO */}
               {logoUrl && (
                 <img
                   src={logoUrl}
@@ -431,32 +453,34 @@ export default function BPage() {
             </div>
           </div>
 
-          {/* 左下：同系列模板切換（縮圖只抓 bg_path） */}
-          <div className="mt-6">
-            <div className="text-[13px] mb-2 font-semibold text-slate-700">
-              選擇模板
+          {/* 左下：同系列模板切換（只有選了模板才顯示） */}
+          {picked && siblings.length > 0 && (
+            <div className="mt-6">
+              <div className="text-[13px] mb-2 font-semibold text-slate-700">
+                選擇模板
+              </div>
+              <div className="flex gap-3">
+                {siblings.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    onClick={() => setPicked(tpl)}
+                    className={`w-14 h-16 rounded-xl shadow border overflow-hidden ${
+                      picked?.id === tpl.id ? "ring-2 ring-black" : ""
+                    }`}
+                    title={tpl.name}
+                  >
+                    <img
+                      src={getThumbFromBg(tpl)}
+                      onError={(e) => (e.currentTarget.src = placeholder)}
+                      className="w-full h-full object-cover"
+                      alt={tpl.name}
+                      draggable={false}
+                    />
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex gap-3">
-              {siblings.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  onClick={() => setPicked(tpl)}
-                  className={`w-14 h-16 rounded-xl shadow border overflow-hidden ${
-                    picked?.id === tpl.id ? "ring-2 ring-black" : ""
-                  }`}
-                  title={tpl.name}
-                >
-                  <img
-                    src={getThumbFromBg(tpl)}
-                    onError={(e) => (e.currentTarget.src = placeholder)}
-                    className="w-full h-full object-cover"
-                    alt={tpl.name}
-                    draggable={false}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
           {/* 上傳 LOGO */}
           <div className="mt-6">
@@ -522,8 +546,9 @@ export default function BPage() {
                   >
                     →
                   </button>
+                  {/* 刪除 => 恢復成公司預設 LOGO */}
                   <button
-                    onClick={() => setLogoUrl(null)}
+                    onClick={() => setLogoUrl(DEFAULT_LOGO)}
                     className="ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
                   >
                     刪除 Logo
