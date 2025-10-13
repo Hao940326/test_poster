@@ -32,13 +32,16 @@ type TemplateRowLite = {
   text_layers: TextLayer[];
 };
 
-/* ---------------- Utils ---------------- */
+/* ---------------- Utils & Constants ---------------- */
 const placeholder =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
-/** ✅ 預設公司 LOGO（請換成你的公開網址） */
+/** ✅ 你的公司預設 LOGO（改成實際公開網址） */
 const DEFAULT_LOGO =
   "data:image/png;base64,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";
+
+/** Logo 狀態：是否為預設 */
+type LogoState = { url: string | null; isDefault: boolean };
 
 function safeKey(name: string) {
   return name
@@ -51,7 +54,7 @@ function safeKey(name: string) {
     .toLowerCase();
 }
 
-/** 基底名稱：去尾碼（空白/底線/連字/「款/版」+ 數字），例 AI1、AI-01、AI_2、AI款3 -> AI */
+/** 取系列基底名：AI1 / AI_2 / AI款3 => AI */
 function baseName(name: string) {
   if (!name) return "";
   const half = name.replace(/[０-９]/g, (d) =>
@@ -60,7 +63,7 @@ function baseName(name: string) {
   return half.trim().replace(/(?:[\s_-]*?(?:款|版)?)?\s*[_\- ]*\d+\s*$/u, "");
 }
 
-/** 取名稱尾數字；沒有則回 -1（用於排序讓「無尾碼」排最前） */
+/** 名稱尾數字；沒有則 -1（排序用） */
 function tailNumber(s: string) {
   s = s.replace(/[０-９]/g, (d) =>
     String.fromCharCode(d.charCodeAt(0) - 0xfee0)
@@ -85,7 +88,6 @@ const CATEGORY_STYLES: Record<string, { dot: string; pill: string }> = {
   其他: { dot: "bg-slate-300", pill: "bg-slate-500 text-white" },
 };
 
-/* 用名稱猜分類（之後可改成 DB 欄位） */
 function guessCategory(name: string): string {
   name = baseName(name);
   if (/3D筆|拼豆|黏土|水珠|氣球/i.test(name)) return "創意手作";
@@ -95,22 +97,23 @@ function guessCategory(name: string): string {
   return "其他";
 }
 
-/** 依基底名分組後，只取每組代表模板（無尾碼優先，其次數字最小） */
+/** 每系列只取代表模板（無尾碼優先、再小號碼） */
 function representativesByBase(list: TemplateRowLite[]) {
-  const buckets = new Map<string, TemplateRowLite[]>();
-  for (const t of list) {
+  const map = new Map<string, TemplateRowLite[]>();
+  list.forEach((t) => {
     const b = baseName(t.name);
-    if (!buckets.has(b)) buckets.set(b, []);
-    buckets.get(b)!.push(t);
-  }
+    if (!map.has(b)) map.set(b, []);
+    map.get(b)!.push(t);
+  });
   const reps: TemplateRowLite[] = [];
-  for (const [, arr] of buckets) {
+  for (const arr of map.values()) {
     arr.sort((a, b) => {
-      const na = tailNumber(a.name), nb = tailNumber(b.name);
+      const na = tailNumber(a.name),
+        nb = tailNumber(b.name);
       if (na === nb) return a.name.localeCompare(b.name, "zh-Hant");
       return na - nb;
     });
-    reps.push(arr[0]); // 每組代表
+    reps.push(arr[0]);
   }
   return reps;
 }
@@ -124,16 +127,11 @@ export default function BPage() {
   const [loading, setLoading] = useState(true);
   const stageWrapRef = useRef<HTMLDivElement>(null);
 
-  // === LOGO 狀態 ===
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [logoPos, setLogoPos] = useState({
-    x: 0,
-    y: 0,
-    size: 300, // 預設放大
-  });
+  // Logo 狀態（分預設 / 客戶）
+  const [logo, setLogo] = useState<LogoState>({ url: null, isDefault: false });
+  const [logoPos, setLogoPos] = useState({ x: 0, y: 0, size: 300 });
 
-
-  /* ---------------- 初次載入 ---------------- */
+  /* -------- 初次載入：不選模板，放公司 Logo（置中&放大） -------- */
   useEffect(() => {
     (async () => {
       try {
@@ -149,22 +147,20 @@ export default function BPage() {
           text_layers: r.text_layers,
         }));
         setTemplates(mapped);
-        // ❌ 不預設選任何模板；只放公司 LOGO
-        setLogoUrl(DEFAULT_LOGO);
-        setLogoPos({
-        x: (1080 - 300) / 2, // 寬度 1080 為預設畫布，logo 寬 300
-        y: (1528 - 300) / 2, // 高度 1528 為預設畫布
-        size: 300,
-      });
 
+        // 初次顯示公司 Logo（1080x1528 為預設畫布；若你有固定別的尺寸可調整）
+        const W = 1080,
+          H = 1528,
+          S = 300;
+        setLogo({ url: DEFAULT_LOGO, isDefault: true });
+        setLogoPos({ x: (W - S) / 2, y: (H - S) / 2, size: S });
       } finally {
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* 取得 icon (Storage public) */
+  /* ------- 工具 ------- */
   function getIconUrl(t: TemplateRowLite) {
     const path = t.icon_path!;
     const { data } = supabase.storage
@@ -173,7 +169,7 @@ export default function BPage() {
     return data?.publicUrl ?? placeholder;
   }
 
-  /** 只用背景圖當縮圖；沒有就顯示 placeholder */
+  /** 左下縮圖只抓背景 */
   function getThumbFromBg(t: TemplateRowLite) {
     const p = t.bg_path;
     if (!p) return placeholder;
@@ -183,13 +179,12 @@ export default function BPage() {
   function selectTemplate(t: TemplateRowLite) {
     setPicked(t);
 
-    // 文字初始化
     const init: Record<string, string> = {};
     for (const L of t.text_layers) init[L.id] = L.text;
     setValues(init);
 
-    // ✅ 一按模板就把 Logo 隱藏/移除
-    setLogoUrl(null);
+    // ✅ 選模板時只移除「預設 Logo」，若已是客戶 Logo 就保留
+    setLogo((prev) => (prev.isDefault ? { url: null, isDefault: false } : prev));
   }
 
   function setFieldForLabel(match: RegExp, text: string) {
@@ -199,7 +194,6 @@ export default function BPage() {
     setValues((o) => ({ ...o, [hit.id]: text }));
   }
 
-  // 從右側表單抓目前值（對應文字層）
   function getFieldValue(fieldKey: typeof FIELD_KEYS[number]["key"]) {
     if (!picked) return "";
     const conf = FIELD_KEYS.find((f) => f.key === fieldKey)!;
@@ -207,7 +201,6 @@ export default function BPage() {
     return hit ? values[hit.id] ?? "" : "";
   }
 
-  // 安全檔名
   function toSafeFilename(s: string, fallback = "未命名") {
     s = (s ?? "").replace(/\u3000/g, " ").trim();
     s = s.replace(/[\\\/:\*\?"<>\|\u0000-\u001F]/g, "");
@@ -223,7 +216,7 @@ export default function BPage() {
 
   /* ---------------- 下載 PDF ---------------- */
   async function downloadPDF() {
-    if (!stageWrapRef.current || !picked) return; // 未選模板不允許下載
+    if (!stageWrapRef.current || !picked) return;
     const html2canvas = (await import("html2canvas")).default;
     const { jsPDF } = await import("jspdf");
 
@@ -268,7 +261,6 @@ export default function BPage() {
 
     pdf.addImage(imgData, "PNG", offsetX, offsetY, imgW, imgH, undefined, "FAST");
 
-    // 檔名：補習班名稱 + 基底才藝名
     const schoolInput = getFieldValue("school");
     const courseBase = baseName(picked?.name ?? "");
     const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(
@@ -277,13 +269,12 @@ export default function BPage() {
     pdf.save(fileName);
   }
 
-  /* ---------------- 預覽尺寸 ---------------- */
+  /* ---------------- 尺寸 / 拖曳 ---------------- */
   const w = picked?.width ?? 1080;
   const h = picked?.height ?? 1528;
   const MAX_PREVIEW_WIDTH = 460;
   const scale = Math.min(MAX_PREVIEW_WIDTH / w, 1);
 
-  // 把滑鼠/觸控座標 -> 海報原始 px（校正 scale）
   const getStagePoint = (clientX: number, clientY: number) => {
     const rect = stageWrapRef.current!.getBoundingClientRect();
     return {
@@ -292,7 +283,6 @@ export default function BPage() {
     };
   };
 
-  // LOGO 拖曳
   const startDragLogo = (startX: number, startY: number) => {
     const offX = startX - logoPos.x;
     const offY = startY - logoPos.y;
@@ -331,19 +321,20 @@ export default function BPage() {
     window.addEventListener("touchcancel", onTouchEnd, { passive: false });
   };
 
-  /* --------- 兄弟模板：同系列多樣式（例：AI / AI1 / AI2） --------- */
+  /* --------- 同系列模板切換 --------- */
   const siblings = useMemo(() => {
     if (!picked) return [] as TemplateRowLite[];
     const bn = baseName(picked.name);
     const same = templates.filter((t) => baseName(t.name) === bn);
     return same.sort((a, b) => {
-      const na = tailNumber(a.name), nb = tailNumber(b.name);
+      const na = tailNumber(a.name),
+        nb = tailNumber(b.name);
       if (na === nb) return a.name.localeCompare(b.name, "zh-Hant");
-      return na - nb; // 無數字(-1) 會排最前
+      return na - nb;
     });
   }, [picked, templates]);
 
-  /* --------- 右側選課（只顯示每系列代表） --------- */
+  /* --------- 右側選課（只顯示代表） --------- */
   const grouped = useMemo(() => {
     const reps = representativesByBase(templates);
     const map = new Map<string, TemplateRowLite[]>();
@@ -392,7 +383,7 @@ export default function BPage() {
                 backgroundPosition: "center",
               }}
             >
-              {/* 文字層：只有選了模板才顯示 */}
+              {/* 文字層：選了模板才顯示 */}
               {picked &&
                 picked.text_layers.map((L) => (
                   <div
@@ -419,10 +410,10 @@ export default function BPage() {
                   </div>
                 ))}
 
-              {/* LOGO 層（可拖曳/縮放）— 初次載入會看到 DEFAULT_LOGO */}
-              {logoUrl && (
+              {/* Logo：預設不可拖曳/不可點；客戶 Logo 可拖曳 */}
+              {logo.url && (
                 <img
-                  src={logoUrl}
+                  src={logo.url}
                   alt="Logo"
                   draggable={false}
                   onDragStart={(e) => e.preventDefault()}
@@ -432,17 +423,19 @@ export default function BPage() {
                     top: logoPos.y,
                     width: logoPos.size,
                     height: "auto",
-                    cursor: "grab",
                     zIndex: 50,
+                    cursor: logo.isDefault ? "default" : "grab",
+                    pointerEvents: logo.isDefault ? "none" : "auto",
                     userSelect: "none",
-                    pointerEvents: "auto",
                   }}
                   onMouseDown={(e) => {
+                    if (logo.isDefault) return;
                     e.preventDefault();
                     const p = getStagePoint(e.clientX, e.clientY);
                     startDragLogo(p.x, p.y);
                   }}
                   onTouchStart={(e) => {
+                    if (logo.isDefault) return;
                     const t = e.touches[0];
                     if (!t) return;
                     const p = getStagePoint(t.clientX, t.clientY);
@@ -453,7 +446,7 @@ export default function BPage() {
             </div>
           </div>
 
-          {/* 左下：同系列模板切換（只有選了模板才顯示） */}
+          {/* 左下：同系列模板（未選模板不顯示） */}
           {picked && siblings.length > 0 && (
             <div className="mt-6">
               <div className="text-[13px] mb-2 font-semibold text-slate-700">
@@ -482,7 +475,7 @@ export default function BPage() {
             </div>
           )}
 
-          {/* 上傳 LOGO */}
+          {/* 上傳 / 控制 Logo（預設時禁用控制） */}
           <div className="mt-6">
             <div className="text-[13px] mb-2 font-semibold text-slate-700">
               上傳LOGO
@@ -497,13 +490,19 @@ export default function BPage() {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   const reader = new FileReader();
-                  reader.onload = () => setLogoUrl(reader.result as string);
+                  reader.onload = () => {
+                    setLogo({ url: reader.result as string, isDefault: false });
+                    const W = picked?.width ?? 1080;
+                    const H = picked?.height ?? 1528;
+                    const S = 300;
+                    setLogoPos({ x: (W - S) / 2, y: (H - S) / 2, size: S });
+                  };
                   reader.readAsDataURL(file);
                 }}
               />
             </label>
 
-            {logoUrl && (
+            {logo.url && (
               <div className="mt-3 space-y-3">
                 <div className="flex items-center gap-2">
                   <label className="text-sm">大小：</label>
@@ -512,6 +511,7 @@ export default function BPage() {
                     min="40"
                     max="320"
                     value={logoPos.size}
+                    disabled={logo.isDefault}
                     onChange={(e) =>
                       setLogoPos((o) => ({ ...o, size: +e.target.value }))
                     }
@@ -522,33 +522,25 @@ export default function BPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm">位置：</span>
+                  {[
+                    { k: "up",  fn: () => setLogoPos((o) => ({ ...o, y: o.y - 1 })) },
+                    { k: "down", fn: () => setLogoPos((o) => ({ ...o, y: o.y + 1 })) },
+                    { k: "left", fn: () => setLogoPos((o) => ({ ...o, x: o.x - 1 })) },
+                    { k: "right",fn: () => setLogoPos((o) => ({ ...o, x: o.x + 1 })) },
+                  ].map(({ k, fn }) => (
+                    <button
+                      key={k}
+                      onClick={!logo.isDefault ? fn : undefined}
+                      disabled={logo.isDefault}
+                      className={`px-2 py-1 border rounded ${
+                        logo.isDefault ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      {k === "up" ? "↑" : k === "down" ? "↓" : k === "left" ? "←" : "→"}
+                    </button>
+                  ))}
                   <button
-                    onClick={() => setLogoPos((o) => ({ ...o, y: o.y - 1 }))}
-                    className="px-2 py-1 border rounded"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    onClick={() => setLogoPos((o) => ({ ...o, y: o.y + 1 }))}
-                    className="px-2 py-1 border rounded"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    onClick={() => setLogoPos((o) => ({ ...o, x: o.x - 1 }))}
-                    className="px-2 py-1 border rounded"
-                  >
-                    ←
-                  </button>
-                  <button
-                    onClick={() => setLogoPos((o) => ({ ...o, x: o.x + 1 }))}
-                    className="px-2 py-1 border rounded"
-                  >
-                    →
-                  </button>
-                  {/* 刪除 => 恢復成公司預設 LOGO */}
-                  <button
-                    onClick={() => setLogoUrl(DEFAULT_LOGO)}
+                    onClick={() => setLogo({ url: null, isDefault: false })} // 真的清空
                     className="ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
                   >
                     刪除 Logo
@@ -561,7 +553,6 @@ export default function BPage() {
 
         {/* 右：選課 + 表單 + 下載 */}
         <div className="col-span-7">
-          {/* 選擇課程（分類群組；只顯示代表模板） */}
           <div className="mb-6">
             <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               選擇課程
@@ -677,7 +668,6 @@ export default function BPage() {
         </div>
       </div>
 
-      {/* 頁尾 */}
       <footer className="mt-10 bg-[#FFC840] text-[12px] text-white/90 py-3 text-center tracking-wider">
         國王才藝 KING'S TALENT ｜本平台模板由國王才藝原創設計，僅限才藝機構之招生宣傳使用，請勿轉售、重製或作商業用途。
       </footer>
