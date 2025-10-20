@@ -92,7 +92,7 @@ function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: 
   }, [supabase, onUser]);
 
   async function loginGoogle() {
-    const redirect = "/studio";
+    const redirect = "/";
     const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
