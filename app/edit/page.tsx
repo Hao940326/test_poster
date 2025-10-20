@@ -305,7 +305,7 @@ export default function BPage() {
     }
     for (const v of map.values())
       v.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
-    const order = ["創意手作", "金智挑戰", "STEAM啟航", "律動節奏", "其他"];
+    const order = ["創意手作", "益智挑戰", "STEAM啟航", "律動節奏", "其他"];
     return order
       .filter((k) => map.has(k))
       .map((k) => ({ name: k, items: map.get(k)! }));
