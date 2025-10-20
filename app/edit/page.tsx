@@ -696,32 +696,29 @@ export default function BPage() {
           <div className="mt-2 flex flex-wrap gap-3">
             <button
               onClick={downloadPNG}
-              className="px-6 py-3 rounded-full bg-black text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
+              className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
             >
               下載 PNG 圖檔
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                <path d="M12 16l4-5h-3V4h-2v7H8l4 5zm8 2H4v2h16v-2z"/>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 4v10" />
+                <path d="M8 10l4 4 4-4" />
+                <path d="M4 20h16" />
               </svg>
             </button>
 
             <button
               onClick={downloadPDF}
-              className="px-6 py-3 rounded-full bg-black text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
+              className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
             >
               下載 PDF 列印
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
-                />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 4v10" />
+                <path d="M8 10l4 4 4-4" />
+                <path d="M4 20h16" />
               </svg>
             </button>
           </div>
