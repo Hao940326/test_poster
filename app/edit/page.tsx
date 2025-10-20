@@ -125,7 +125,11 @@ export default function BPage() {
   const [picked, setPicked] = useState<TemplateRowLite | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+
+  // 量測預覽容器寬度，用於計算 scale
+  const previewWrapOuterRef = useRef<HTMLDivElement>(null);
   const stageWrapRef = useRef<HTMLDivElement>(null);
+  const [wrapWidth, setWrapWidth] = useState<number>(0);
 
   // Logo 狀態（分預設 / 客戶）
   const [logo, setLogo] = useState<LogoState>({ url: null, isDefault: false });
@@ -137,7 +141,7 @@ export default function BPage() {
       try {
         setLoading(true);
         const rows = await listTemplates();
-        const mapped: TemplateRowLite[] = rows.map((r) => ({
+        const mapped: TemplateRowLite[] = rows.map((r: any) => ({
           id: r.id,
           name: r.name,
           width: r.width,
@@ -158,6 +162,18 @@ export default function BPage() {
         setLoading(false);
       }
     })();
+  }, []);
+
+  // 量測容器寬度（ResizeObserver）
+  useEffect(() => {
+    const el = previewWrapOuterRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) setWrapWidth(Math.floor(e.contentRect.width));
+    });
+    ro.observe(el);
+    setWrapWidth(el.clientWidth || 0);
+    return () => ro.disconnect();
   }, []);
 
   /* ------- 工具 ------- */
@@ -214,66 +230,10 @@ export default function BPage() {
     return s;
   }
 
-  /* ---------------- 下載 PDF ---------------- */
-  async function downloadPDF() {
-    if (!stageWrapRef.current || !picked) return;
-    const html2canvas = (await import("html2canvas")).default;
-    const { jsPDF } = await import("jspdf");
-
-    const w = picked.width;
-    const h = picked.height;
-    const stage =
-      stageWrapRef.current.querySelector<HTMLDivElement>("[data-stage]");
-    if (!stage) return;
-
-    const canvas = await html2canvas(stage, {
-      scale: 3,
-      useCORS: true,
-      backgroundColor: null,
-      width: w,
-      height: h,
-      windowWidth: w,
-      windowHeight: h,
-      scrollX: 0,
-      scrollY: 0,
-      onclone: (doc) => {
-        const cloned = doc.querySelector("[data-stage]") as HTMLElement | null;
-        if (cloned) {
-          cloned.style.transform = "none";
-          cloned.style.transformOrigin = "top left";
-          cloned.style.width = `${w}px`;
-          cloned.style.height = `${h}px`;
-        }
-      },
-    });
-
-    const imgData = canvas.toDataURL("image/png", 1.0);
-    const pdf = new jsPDF({ orientation: "p", unit: "px", format: "a4" });
-    pdf.internal.scaleFactor = 1;
-
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = Math.min(pageW / w, pageH / h);
-    const imgW = w * ratio;
-    const imgH = h * ratio;
-    const offsetX = (pageW - imgW) / 2;
-    const offsetY = (pageH - imgH) / 2;
-
-    pdf.addImage(imgData, "PNG", offsetX, offsetY, imgW, imgH, undefined, "FAST");
-
-    const schoolInput = getFieldValue("school");
-    const courseBase = baseName(picked?.name ?? "");
-    const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(
-      courseBase
-    )}.pdf`;
-    pdf.save(fileName);
-  }
-
   /* ---------------- 尺寸 / 拖曳 ---------------- */
   const w = picked?.width ?? 1080;
   const h = picked?.height ?? 1528;
-  const MAX_PREVIEW_WIDTH = 460;
-  const scale = Math.min(MAX_PREVIEW_WIDTH / w, 1);
+  const scale = Math.min((wrapWidth > 0 ? wrapWidth : 480) / w, 1);
 
   const getStagePoint = (clientX: number, clientY: number) => {
     const rect = stageWrapRef.current!.getBoundingClientRect();
@@ -351,98 +311,176 @@ export default function BPage() {
       .map((k) => ({ name: k, items: map.get(k)! }));
   }, [templates]);
 
+  /* ---------------- 匯出：PNG / PDF ---------------- */
+  async function getStageCanvas(scaleFactor = 3) {
+    const stage =
+      stageWrapRef.current?.querySelector<HTMLDivElement>("[data-stage]");
+    if (!stage) return null;
+    const html2canvas = (await import("html2canvas")).default;
+    const canvas = await html2canvas(stage, {
+      scale: scaleFactor,
+      useCORS: true,
+      backgroundColor: null,
+      width: w,
+      height: h,
+      windowWidth: w,
+      windowHeight: h,
+      scrollX: 0,
+      scrollY: 0,
+      onclone: (doc) => {
+        const cloned = doc.querySelector("[data-stage]") as HTMLElement | null;
+        if (cloned) {
+          cloned.style.transform = "none";
+          cloned.style.transformOrigin = "top left";
+          cloned.style.width = `${w}px`;
+          cloned.style.height = `${h}px`;
+        }
+      },
+    });
+    return canvas;
+  }
+
+  async function downloadPNG() {
+    if (!stageWrapRef.current) return;
+    const canvas = await getStageCanvas(3);
+    if (!canvas) return;
+
+    const schoolInput = getFieldValue("school");
+    const courseBase = baseName(picked?.name ?? "未選模板");
+    const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(
+      courseBase
+    )}.png`;
+
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png", 1.0);
+    link.download = fileName;
+    link.click();
+  }
+
+  async function downloadPDF() {
+    if (!stageWrapRef.current) return;
+    const canvas = await getStageCanvas(3);
+    if (!canvas) return;
+
+    const { jsPDF } = await import("jspdf");
+    const imgData = canvas.toDataURL("image/png", 1.0);
+    const pdf = new jsPDF({ orientation: "p", unit: "px", format: "a4" });
+    pdf.internal.scaleFactor = 1;
+
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const ratio = Math.min(pageW / w, pageH / h);
+    const imgW = w * ratio;
+    const imgH = h * ratio;
+    const offsetX = (pageW - imgW) / 2;
+    const offsetY = (pageH - imgH) / 2;
+
+    pdf.addImage(imgData, "PNG", offsetX, offsetY, imgW, imgH, undefined, "FAST");
+
+    const schoolInput = getFieldValue("school");
+    const courseBase = baseName(picked?.name ?? "未選模板");
+    const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(
+      courseBase
+    )}.pdf`;
+    pdf.save(fileName);
+  }
+
   /* ---------------- Render ---------------- */
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-[1180px] mx-auto p-8 grid grid-cols-12 gap-10">
+      <div className="max-w-[1180px] mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
         {/* 左：預覽區 */}
-        <div className="col-span-5">
+        <div className="lg:col-span-5">
           <div className="mb-3 inline-flex items-center gap-2">
             <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               海報預覽
             </span>
           </div>
 
-          <div
-            className="relative mx-auto shadow rounded border border-slate-200 bg-white"
-            style={{ width: Math.round(w * scale), height: Math.round(h * scale) }}
-            ref={stageWrapRef}
-          >
+          {/* 外層：負責量測寬度 */}
+          <div ref={previewWrapOuterRef} className="w-full">
+            {/* 內層：實際顯示框 */}
             <div
-              data-stage
-              className="absolute top-0 left-0"
-              style={{
-                width: w,
-                height: h,
-                transform: `scale(${scale})`,
-                transformOrigin: "top left",
-                backgroundImage: picked?.bg_path
-                  ? `url(${toPublicUrl(encodeURI(picked.bg_path))})`
-                  : "none",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
+              className="relative mx-auto shadow rounded border border-slate-200 bg-white"
+              style={{ width: "100%", height: Math.round(h * scale) }}
+              ref={stageWrapRef}
             >
-              {/* 文字層：選了模板才顯示 */}
-              {picked &&
-                picked.text_layers.map((L) => (
-                  <div
-                    key={L.id}
-                    className="absolute select-none px-1"
-                    style={{
-                      left: L.x,
-                      top: L.y,
-                      width: Math.max(1, L.width),
-                      color: L.color,
-                      fontSize: L.fontSize,
-                      fontWeight: L.weight,
-                      fontStyle: L.italic ? "italic" : "normal",
-                      textAlign: L.align as any,
-                      textTransform: L.uppercase ? "uppercase" : "none",
-                      textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
-                      lineHeight: 1.1,
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      zIndex: 10,
-                    }}
-                  >
-                    {values[L.id] !== undefined ? values[L.id] : L.text}
-                  </div>
-                ))}
+              <div
+                data-stage
+                className="absolute top-0 left-0"
+                style={{
+                  width: w,
+                  height: h,
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
+                  backgroundImage: picked?.bg_path
+                    ? `url(${toPublicUrl(encodeURI(picked.bg_path))})`
+                    : "none",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              >
+                {/* 文字層：選了模板才顯示 */}
+                {picked &&
+                  picked.text_layers.map((L) => (
+                    <div
+                      key={L.id}
+                      className="absolute select-none px-1"
+                      style={{
+                        left: L.x,
+                        top: L.y,
+                        width: Math.max(1, L.width),
+                        color: L.color,
+                        fontSize: L.fontSize,
+                        fontWeight: L.weight,
+                        fontStyle: L.italic ? "italic" : "normal",
+                        textAlign: L.align as any,
+                        textTransform: L.uppercase ? "uppercase" : "none",
+                        textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
+                        lineHeight: 1.1,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        zIndex: 10,
+                      }}
+                    >
+                      {values[L.id] !== undefined ? values[L.id] : L.text}
+                    </div>
+                  ))}
 
-              {/* Logo：預設不可拖曳/不可點；客戶 Logo 可拖曳 */}
-              {logo.url && (
-                <img
-                  src={logo.url}
-                  alt="Logo"
-                  draggable={false}
-                  onDragStart={(e) => e.preventDefault()}
-                  style={{
-                    position: "absolute",
-                    left: logoPos.x,
-                    top: logoPos.y,
-                    width: logoPos.size,
-                    height: "auto",
-                    zIndex: 50,
-                    cursor: logo.isDefault ? "default" : "grab",
-                    pointerEvents: logo.isDefault ? "none" : "auto",
-                    userSelect: "none",
-                  }}
-                  onMouseDown={(e) => {
-                    if (logo.isDefault) return;
-                    e.preventDefault();
-                    const p = getStagePoint(e.clientX, e.clientY);
-                    startDragLogo(p.x, p.y);
-                  }}
-                  onTouchStart={(e) => {
-                    if (logo.isDefault) return;
-                    const t = e.touches[0];
-                    if (!t) return;
-                    const p = getStagePoint(t.clientX, t.clientY);
-                    startDragLogo(p.x, p.y);
-                  }}
-                />
-              )}
+                {/* Logo：預設不可拖曳/不可點；客戶 Logo 可拖曳 */}
+                {logo.url && (
+                  <img
+                    src={logo.url}
+                    alt="Logo"
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
+                    style={{
+                      position: "absolute",
+                      left: logoPos.x,
+                      top: logoPos.y,
+                      width: logoPos.size,
+                      height: "auto",
+                      zIndex: 50,
+                      cursor: logo.isDefault ? "default" : "grab",
+                      pointerEvents: logo.isDefault ? "none" : "auto",
+                      userSelect: "none",
+                    }}
+                    onMouseDown={(e) => {
+                      if (logo.isDefault) return;
+                      e.preventDefault();
+                      const p = getStagePoint(e.clientX, e.clientY);
+                      startDragLogo(p.x, p.y);
+                    }}
+                    onTouchStart={(e) => {
+                      if (logo.isDefault) return;
+                      const t = e.touches[0];
+                      if (!t) return;
+                      const p = getStagePoint(t.clientX, t.clientY);
+                      startDragLogo(p.x, p.y);
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -504,7 +542,7 @@ export default function BPage() {
 
             {logo.url && (
               <div className="mt-3 space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="text-sm">大小：</label>
                   <input
                     type="range"
@@ -515,33 +553,36 @@ export default function BPage() {
                     onChange={(e) =>
                       setLogoPos((o) => ({ ...o, size: +e.target.value }))
                     }
+                    className="w-full sm:w-64"
                   />
                   <span className="text-xs text-slate-500">
                     {logoPos.size}px
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm">位置：</span>
-                  {[
-                    { k: "up",  fn: () => setLogoPos((o) => ({ ...o, y: o.y - 1 })) },
-                    { k: "down", fn: () => setLogoPos((o) => ({ ...o, y: o.y + 1 })) },
-                    { k: "left", fn: () => setLogoPos((o) => ({ ...o, x: o.x - 1 })) },
-                    { k: "right",fn: () => setLogoPos((o) => ({ ...o, x: o.x + 1 })) },
-                  ].map(({ k, fn }) => (
-                    <button
-                      key={k}
-                      onClick={!logo.isDefault ? fn : undefined}
-                      disabled={logo.isDefault}
-                      className={`px-2 py-1 border rounded ${
-                        logo.isDefault ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      {k === "up" ? "↑" : k === "down" ? "↓" : k === "left" ? "←" : "→"}
-                    </button>
-                  ))}
+                  <div className="flex gap-2">
+                    {[
+                      { k: "up", fn: () => setLogoPos((o) => ({ ...o, y: o.y - 1 })) },
+                      { k: "down", fn: () => setLogoPos((o) => ({ ...o, y: o.y + 1 })) },
+                      { k: "left", fn: () => setLogoPos((o) => ({ ...o, x: o.x - 1 })) },
+                      { k: "right", fn: () => setLogoPos((o) => ({ ...o, x: o.x + 1 })) },
+                    ].map(({ k, fn }) => (
+                      <button
+                        key={k}
+                        onClick={!logo.isDefault ? fn : undefined}
+                        disabled={logo.isDefault}
+                        className={`px-2 py-1 border rounded ${
+                          logo.isDefault ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                      >
+                        {k === "up" ? "↑" : k === "down" ? "↓" : k === "left" ? "←" : "→"}
+                      </button>
+                    ))}
+                  </div>
                   <button
                     onClick={() => setLogo({ url: null, isDefault: false })} // 真的清空
-                    className="ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
+                    className="ml-0 sm:ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
                   >
                     刪除 Logo
                   </button>
@@ -552,7 +593,7 @@ export default function BPage() {
         </div>
 
         {/* 右：選課 + 表單 + 下載 */}
-        <div className="col-span-7">
+        <div className="lg:col-span-7">
           <div className="mb-6">
             <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
               選擇課程
@@ -578,14 +619,14 @@ export default function BPage() {
                         </span>
                         <div className="grow border-dotted border-b border-slate-300 ml-2" />
                       </div>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-2 sm:gap-3">
                         {grp.items.map((t) => {
                           const iconUrl = getIconUrl(t);
                           return (
                             <button
                               key={t.id}
                               onClick={() => selectTemplate(t)}
-                              className={`w-[80px] h-[80px] p-1 rounded-xl border hover:shadow transition flex items-center justify-center ${
+                              className={`w-[72px] h-[72px] p-1 rounded-xl border hover:shadow transition flex items-center justify-center ${
                                 picked?.id === t.id
                                   ? "ring-2 ring-slate-900"
                                   : ""
@@ -597,7 +638,7 @@ export default function BPage() {
                                 onError={(e) =>
                                   ((e.currentTarget.src = placeholder))
                                 }
-                                className="w-[64px] h-[64px] object-contain"
+                                className="w-[56px] h-[56px] object-contain"
                                 alt={baseName(t.name)}
                               />
                             </button>
@@ -619,10 +660,10 @@ export default function BPage() {
 
             <div className="mt-4 space-y-3">
               {FIELD_KEYS.map(({ key, match, label }) => (
-                <div key={key} className="flex items-center gap-3">
-                  <label className="w-32 text-sm text-slate-700">{label}</label>
+                <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <label className="w-full sm:w-32 text-sm text-slate-700">{label}</label>
                   <input
-                    className="flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
+                    className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
                     placeholder="請輸入…"
                     value={
                       picked
@@ -641,12 +682,21 @@ export default function BPage() {
             </div>
           </div>
 
-          {/* 下載 PDF */}
-          <div className="mt-2">
+          {/* 下載：PNG / PDF */}
+          <div className="mt-2 flex flex-wrap gap-3">
+            <button
+              onClick={downloadPNG}
+              className="px-6 py-3 rounded-full bg-slate-800 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
+            >
+              下載 PNG 圖檔
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 16l4-5h-3V4h-2v7H8l4 5zm8 2H4v2h16v-2z"/>
+              </svg>
+            </button>
+
             <button
               onClick={downloadPDF}
               className="px-6 py-3 rounded-full bg-black text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
-              disabled={!picked}
             >
               下載 PDF 列印
               <svg
@@ -668,7 +718,7 @@ export default function BPage() {
         </div>
       </div>
 
-      <footer className="mt-10 bg-[#FFC840] text-[12px] text-white/90 py-3 text-center tracking-wider">
+      <footer className="mt-10 bg-[#FFC840] text-[11px] sm:text-[12px] text-white/90 py-3 text-center tracking-wider px-3">
         國王才藝 KING'S TALENT ｜本平台模板由國王才藝原創設計，僅限才藝機構之招生宣傳使用，請勿轉售、重製或作商業用途。
       </footer>
     </div>
