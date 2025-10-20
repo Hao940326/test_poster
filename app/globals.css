@@ -1,71 +1,56 @@
-@import "tailwindcss";
-
-/* ---------------- 🎨 色彩主題變數 ---------------- */
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-/* ---------------- 🈶 GenYoGothicTW 本地字體 ---------------- */
+/* ---------------- 🈶 GenYoGothicTW (from Supabase Storage) ---------------- */
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("/fonts/genyo/GenYoGothic-EL.ttc") format("truetype");
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-EL.ttc")
+       format("truetype");
   font-weight: 200;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("/fonts/genyo/GenYoGothic-L.ttc") format("truetype");
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-L.ttc")
+       format("truetype");
   font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("/fonts/genyo/GenYoGothic-N.ttc") format("truetype");
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-N.ttc")
+       format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("/fonts/genyo/GenYoGothic-M.ttc") format("truetype");
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-M.ttc")
+       format("truetype");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("/fonts/genyo/GenYoGothic-R.ttc") format("truetype");
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-R.ttc")
+       format("truetype");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("/fonts/genyo/GenYoGothic-B.ttc") format("truetype");
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-B.ttc")
+       format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("/fonts/genyo/GenYoGothic-H.ttc") format("truetype");
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-H.ttc")
+       format("truetype");
   font-weight: 800;
   font-style: normal;
   font-display: swap;
