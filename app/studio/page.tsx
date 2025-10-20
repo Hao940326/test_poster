@@ -673,7 +673,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
           <button
             className="w-full px-3 py-2 rounded-xl shadow bg-indigo-600 text-white"
             onClick={() => {
-              window.location.href = "poster.kingstalent.com.tw";//雲端
+              window.location.href = "https://poster.kingstalent.com.tw/";//雲端
               //window.location.href = "http://localhost:3000/edit";//本機
             }}
           >
