@@ -852,10 +852,14 @@ function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: Text
         <div>
           <label className="block text-sm mb-1">粗細</label>
           <select className="w-full border rounded-xl px-3 py-2" value={layer.weight} onChange={(e)=>onChange({ ...layer, weight: Number(e.target.value) as any })}>
-            <option value={300}>300</option>
-            <option value={400}>400</option>
-            <option value={600}>600</option>
-            <option value={800}>800</option>
+            <option value={200}>200（ExtraLight）</option>
+            <option value={300}>300（Light）</option>
+            <option value={400}>400（Regular）</option>
+            <option value={500}>500（Medium）</option>
+            <option value={600}>600（Semibold）</option>
+            <option value={700}>700（Bold）</option>
+            <option value={900}>900（Heavy）</option>
+
           </select>
         </div>
       </div>
