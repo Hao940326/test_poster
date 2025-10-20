@@ -134,25 +134,17 @@ export async function getTemplateByName(name: string): Promise<TemplateRow | nul
 }
 
 /** 建立/更新模板：自動補上 owner（RLS 會再次驗證） */
-export async function upsertTemplate(row: Partial<TemplateRow>) {
-  const sb = requireSb();
-
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) throw new Error("未登入，無法儲存模板");
-
-  const payload: Partial<TemplateRow> = {
-    ...row,
-    owner: row.owner ?? user.id,
-  };
-
+export async function upsertTemplate(row: any) {
+  const sb = getSupabase();
   const { data, error } = await sb
     .from("talent_templates")
-    .upsert(payload, { onConflict: "id" })
-    .select("*")
+    .upsert(row, { onConflict: "id" })  // ✅ 關鍵：以 id 為主鍵覆蓋
+    .select()
     .single();
   if (error) throw error;
-  return data as TemplateRow;
+  return data;
 }
+
 
 /** 依名稱刪除（僅刪自己的；RLS 也會擋） */
 export async function deleteTemplateByName(name: string) {
