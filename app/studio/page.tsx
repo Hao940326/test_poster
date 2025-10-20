@@ -1,12 +1,29 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Head from "next/head";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
 import {
-  TextLayer, TemplateRow,
+  TextLayer as BaseTextLayer, TemplateRow,
   listTemplates, upsertTemplate, getTemplateByName, deleteTemplateByName,
   ensureLogin, uploadBgDataUrl, toPublicUrl
 } from "@/lib/dbApi";
+
+/* ------------------- 🆕 字體選單 ------------------- */
+type FontOpt = { key: string; label: string; css: string };
+const FONT_OPTIONS: FontOpt[] = [
+  { key: "genyo-gothic",  label: "源樣黑體 GenYoGothicTW", css: `GenYoGothicTW,"Noto Sans TC",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif` },
+  { key: "system",        label: "系統預設 / System UI",   css: `system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,"Noto Sans TC","Noto Sans",sans-serif` },
+  { key: "noto-sans-tc",  label: "Noto Sans TC（黑體）",     css: `"Noto Sans TC","Noto Sans",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif` },
+  { key: "noto-serif-tc", label: "Noto Serif TC（明體）",    css: `"Noto Serif TC","Noto Serif","Noto Sans TC",serif` },
+  { key: "roboto",        label: "Roboto",                   css: `Roboto,"Noto Sans TC",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif` },
+  { key: "montserrat",    label: "Montserrat",               css: `Montserrat,"Noto Sans TC",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif` },
+];
+
+/* ---------------- 型別擴充：文字層多一個 font ---------------- */
+type TextLayer = BaseTextLayer & {
+  font?: string; // 存放對應 FONT_OPTIONS[i].key
+};
 
 /* ------------------- 🔐 登入頂欄（只留 Google） ------------------- */
 function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: any|null)=>void }) {
@@ -15,15 +32,12 @@ function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: 
 
   React.useEffect(() => {
     let unsub = () => {};
-    // 用同步函式包住 async，確保 cleanup 能正確返回
     const run = async () => {
-      // 1) 先抓 session
       const { data: { session } } = await supabase.auth.getSession();
       const u = session?.user ?? null;
       setUser(u);
       onUser(u);
 
-      // 2) 檢查 allowed_users —— ❗只要「查不到」或「錯誤」，都視為拒絕
       if (u?.email) {
         const email = u.email.toLowerCase();
         const { data, error } = await supabase
@@ -33,7 +47,6 @@ function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: 
           .maybeSingle();
 
         if (error || !data) {
-          // 👉 這裡與原本不同：出錯也當不允許
           await supabase.auth.signOut();
           if (typeof window !== "undefined") {
             localStorage.setItem(
@@ -42,16 +55,14 @@ function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: 
             );
             window.location.href = "/access-denied";
           }
-          return; // 直接結束，不要往下訂閱
+          return;
         }
       }
 
-      // 3) 訂閱登入狀態變化
       const { data: sub } = supabase.auth.onAuthStateChange(async (_evt, session) => {
         const u2 = session?.user ?? null;
         setUser(u2);
         onUser(u2);
-
         if (!u2?.email) return;
 
         const email2 = u2.email.toLowerCase();
@@ -61,7 +72,6 @@ function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: 
           .eq("email", email2)
           .maybeSingle();
 
-        // 👉 同樣：出錯或查不到 = 拒絕
         if (error || !data) {
           await supabase.auth.signOut();
           if (typeof window !== "undefined") {
@@ -112,7 +122,6 @@ function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: 
 }
 
 /* ------------------- 🔧 小工具 ------------------- */
-// File → DataURL
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -121,7 +130,6 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
-// 安全錯誤訊息
 function getErrMsg(e: any): string {
   if (!e) return "未知錯誤";
   if (typeof e === "string") return e;
@@ -130,12 +138,6 @@ function getErrMsg(e: any): string {
   if (e.statusText) return e.statusText;
   if (e.data?.message) return e.data.message;
   try { return JSON.stringify(e); } catch { return String(e); }
-}
-// 分享用編碼（目前未使用，保留）
-function encodeTpl(tpl: any) {
-  const str = JSON.stringify(tpl);
-  const b64 = btoa(unescape(encodeURIComponent(str)));
-  return encodeURIComponent(b64);
 }
 function downloadText(filename: string, text: string) {
   const blob = new Blob([text], { type: "application/json;charset=utf-8" });
@@ -154,20 +156,18 @@ type TplVM = {
   name: string;
   width: number;
   height: number;
-  bgUrl: string;        // 畫布背景（public URL 或 dataURL）
+  bgUrl: string;
   textLayers: TextLayer[];
-  iconUrl?: string;     // icon 公開網址
+  iconUrl?: string;
 };
-
 const uid = () => Math.random().toString(36).slice(2, 10);
-
 const DEFAULT_TPL: TplVM = {
   name: "未命名模板",
   width: 1080,
   height: 1528,
   bgUrl: "",
   textLayers: [
-    { id: uid(), label: "標題", text: "暑期才藝", x: 60, y: 60, width: 420, fontSize: 96, color: "#ffffff", weight: 800, align: "left", shadow: true },
+    { id: uid(), label: "標題", text: "暑期才藝", x: 60, y: 60, width: 420, fontSize: 96, color: "#ffffff", weight: 800, align: "left", shadow: true, font: "noto-sans-tc" },
   ],
 };
 
@@ -186,17 +186,83 @@ export default function StudioPage() {
   }
 
   return (
-    <div className="p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold">A 端｜模板編輯器</h1>
-        <LoginBar supabase={supabase} onUser={setUser} />
+    <>
+      {/* Google Fonts（保留原本） */}
+      <Head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@300;400;600;700;900&family=Roboto:wght@300;400;500;700;900&display=swap"
+          rel="stylesheet"
+        />
+        {/* 🆕 預載入 GenYoGothic（至少預載一兩個常用字重） */}
+        <link rel="preload" as="font" href="/fonts/genyo/GenYoGothic-N.ttc" type="font/ttc" crossOrigin="anonymous" />
+        <link rel="preload" as="font" href="/fonts/genyo/GenYoGothic-B.ttc" type="font/ttc" crossOrigin="anonymous" />
+      </Head>
+
+      {/* 🆕 全域註冊 GenYoGothic（請放好到 /public/fonts/genyo/） */}
+      <style jsx global>{`
+        @font-face {
+          font-family: 'GenYoGothicTW';
+          src: url('/fonts/genyo/GenYoGothic-EL.ttc') format('truetype');
+          font-weight: 200;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: 'GenYoGothicTW';
+          src: url('/fonts/genyo/GenYoGothic-L.ttc') format('truetype');
+          font-weight: 300;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: 'GenYoGothicTW';
+          src: url('/fonts/genyo/GenYoGothic-N.ttc') format('truetype');
+          font-weight: 400;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: 'GenYoGothicTW';
+          src: url('/fonts/genyo/GenYoGothic-M.ttc') format('truetype');
+          font-weight: 500;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: 'GenYoGothicTW';
+          src: url('/fonts/genyo/GenYoGothic-R.ttc') format('truetype');
+          font-weight: 600;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: 'GenYoGothicTW';
+          src: url('/fonts/genyo/GenYoGothic-B.ttc') format('truetype');
+          font-weight: 700;
+          font-style: normal;
+          font-display: swap;
+        }
+        @font-face {
+          font-family: 'GenYoGothicTW';
+          src: url('/fonts/genyo/GenYoGothic-H.ttc') format('truetype');
+          font-weight: 900;
+          font-style: normal;
+          font-display: swap;
+        }
+      `}</style>
+
+      <div className="p-4">
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-xl font-bold">A 端｜模板編輯器</h1>
+          <LoginBar supabase={supabase} onUser={setUser} />
+        </div>
+        <AdminTemplateEditor supabase={supabase} user={user} />
       </div>
-      <AdminTemplateEditor supabase={supabase} user={user} />
-    </div>
+    </>
   );
 }
 
-/* ===================== AdminTemplateEditor（含可縮放畫布） ===================== */
+/* ===================== AdminTemplateEditor（含可縮放 + 多字體） ===================== */
 
 type ZoomMode = number | "fit";
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
@@ -217,12 +283,11 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
     [tpl, selectedId]
   );
 
-  // 依容器大小自動計算「整幅置入」倍率
+  // 整幅置入倍率
   useEffect(() => {
     if (zoom !== "fit") { setScale(typeof zoom === "number" ? zoom : 1); return; }
     const el = canvasOuterRef.current;
     if (!el) return;
-
     const ro = new ResizeObserver(() => {
       const pad = 16;
       const box = el.getBoundingClientRect();
@@ -244,7 +309,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         setAllTpls(rows.map((r: any) => ({
           id: r.id, slug: r.slug, name: r.name,
           width: r.width, height: r.height,
-          textLayers: r.text_layers,
+          textLayers: (r.text_layers as TextLayer[]).map(L => ({ ...L, font: L.font ?? "noto-sans-tc" })),
           bgUrl: r.bg_path ? toPublicUrl(r.bg_path) : "",
           iconUrl: r.icon_path ? toPublicUrl(r.icon_path) : "",
         })));
@@ -259,7 +324,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
     })();
   }, []);
 
-  // 鍵盤微調（保持原本行為）
+  // 鍵盤微調
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const sel = selected;
@@ -285,7 +350,11 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
 
   // 圖層 CRUD
   function addLayer() {
-    const L: TextLayer = { id: uid(), label: `文字層${tpl.textLayers.length + 1}`, text: "新文字", x: 80, y: 80, width: 360, fontSize: 36, color: "#111", weight: 600, align: "left" };
+    const L: TextLayer = {
+      id: uid(), label: `文字層${tpl.textLayers.length + 1}`, text: "新文字",
+      x: 80, y: 80, width: 360, fontSize: 36, color: "#111", weight: 600, align: "left",
+      font: "noto-sans-tc"
+    };
     setTpl(o => ({ ...o, textLayers: [...o.textLayers, L] }));
     setSelectedId(L.id);
   }
@@ -307,10 +376,8 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
     const host = e.currentTarget as HTMLElement;
     const r = host.getBoundingClientRect();
     const { id, dx, dy } = dragRef.current;
-
     const xRaw = (e.clientX - r.left) / scale - dx;
     const yRaw = (e.clientY - r.top) / scale - dy;
-
     const L = tpl.textLayers.find(t => t.id === id);
     if (L) updateLayer({ ...L, x: Math.round(xRaw), y: Math.round(yRaw) });
   }
@@ -328,7 +395,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
       setAllTpls(rows.map((r: any) => ({
         id: r.id, slug: r.slug, name: r.name,
         width: r.width, height: r.height,
-        textLayers: r.text_layers,
+        textLayers: (r.text_layers as TextLayer[]).map(L => ({ ...L, font: L.font ?? "noto-sans-tc" })),
         bgUrl: r.bg_path ? toPublicUrl(r.bg_path) : "",
         iconUrl: r.icon_path ? toPublicUrl(r.icon_path) : "",
       })));
@@ -346,12 +413,9 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
       setLoading(true);
       const sb = getSupabase();
       const { data: { user } } = await sb!.auth.getUser();
-      console.log("目前登入 user.id =", user?.id);
-
       await ensureLogin();
       const id = crypto.randomUUID();
 
-      // 上傳背景圖
       let bg_path: string | undefined;
       if (tpl.bgUrl.startsWith("data:")) {
         bg_path = await uploadBgDataUrl(id, tpl.bgUrl);
@@ -367,7 +431,6 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         is_published: true,
         owner: user?.id ?? null,
       };
-      console.log("準備上傳資料 =", row);
 
       const saved = await upsertTemplate(row);
 
@@ -441,7 +504,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
           name: exist.name,
           width: exist.width,
           height: exist.height,
-          textLayers: exist.text_layers,
+          textLayers: (exist.text_layers as TextLayer[]).map(L => ({ ...L, font: L.font ?? "noto-sans-tc" })),
           bgUrl: exist.bg_path ? toPublicUrl(exist.bg_path) : "",
           iconUrl: exist.icon_path ? toPublicUrl(exist.icon_path) : "",
         });
@@ -471,58 +534,6 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
     } finally {
       setLoading(false);
     }
-  }
-
-  // 分享連結資料（目前未使用，保留）
-  function tplToShare(t: TplVM) {
-    return { width: t.width, height: t.height, bgUrl: t.bgUrl, textLayers: t.textLayers };
-  }
-
-  // 單筆上傳 icon
-  async function uploadIcon(file: File) {
-    await ensureLogin();
-    const sb = getSupabase();
-    const { data: { user } } = await sb!.auth.getUser();
-    if (!user) throw new Error("尚未登入");
-
-    // 確保有模板 id
-    let tplId = tpl.id;
-    if (!tplId) {
-      tplId = crypto.randomUUID();
-      await upsertTemplate({
-        id: tplId,
-        name: tpl.name || "未命名模板",
-        width: tpl.width, height: tpl.height,
-        text_layers: tpl.textLayers,
-        is_published: true,
-        owner: user.id,
-      });
-      setTpl(o => ({ ...o, id: tplId! }));
-    }
-
-    const ext = file.type === "image/jpeg" ? "jpg"
-              : file.type === "image/webp" ? "webp"
-              : "png";
-    const storagePath = `posters/${user.id}/${tplId}/icon.${ext}`;
-
-    const { error: upErr } = await sb!.storage
-      .from("poster-assets")
-      .upload(storagePath, file, {
-        cacheControl: "31536000",
-        upsert: true,
-        contentType: file.type || "image/png",
-      });
-    if (upErr) throw upErr;
-
-    const { error: dbErr } = await sb!
-      .from("talent_templates")
-      .update({ icon_path: storagePath, icon_mime: file.type || "image/png" })
-      .eq("id", tplId);
-    if (dbErr) throw dbErr;
-
-    setTpl(o => ({ ...o, iconUrl: toPublicUrl(storagePath) }));
-    await refreshList();
-    alert("✅ icon 已上傳");
   }
 
   /* ---------------- UI ---------------- */
@@ -587,35 +598,6 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
             <label className="block text-sm">背景圖</label>
             <input type="file" accept="image/*" onChange={(e) => onPickBg(e.target.files?.[0])} />
           </div>
-
-          {/* Icon 上傳 */}
-          <div className="mt-4">
-            <div className="block text-sm font-semibold mb-1">Icon 上傳</div>
-            <div className="w-full border rounded-xl p-2 text-sm bg-slate-50">
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (!f) return;
-                  uploadIcon(f).catch(err => alert("上傳失敗：" + getErrMsg(err)));
-                }}
-              />
-              {tpl.iconUrl ? (
-                <img
-                  src={tpl.iconUrl}
-                  alt="icon"
-                  className="w-10 h-10 object-contain border rounded"
-                  title="目前 icon"
-                />
-              ) : (
-                <span className="text-xs text-slate-500">尚未上傳</span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              會儲存到 <code>poster-assets/posters/&lt;userId&gt;/&lt;templateId&gt;/icon.&lt;ext&gt;</code>
-            </p>
-          </div>
         </div>
 
         <div className="p-4 rounded-2xl shadow bg-white space-y-2">
@@ -664,7 +646,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         </div>
       </div>
 
-      {/* 中欄：畫布（可縮放 + 整幅置入） */}
+      {/* 中欄：畫布（可縮放 + 整幅置入 + 多字體） */}
       <div className="col-span-6">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-xl font-bold">畫布預覽</div>
@@ -686,9 +668,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
                 {Math.round(v*100)}%
               </button>
             ))}
-            <span className="text-sm text-slate-500 ml-2">
-              目前：{Math.round(scale * 100)}%
-            </span>
+            <span className="text-sm text-slate-500 ml-2">目前：{Math.round(scale * 100)}%</span>
           </div>
         </div>
 
@@ -697,7 +677,6 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
           className="relative rounded-2xl shadow bg-white overflow-auto p-4"
           style={{ maxHeight: "85vh" }}
         >
-          {/* 這個容器負責縮放（不改內部座標） */}
           <div
             className="relative mx-auto border bg-white"
             style={{
@@ -714,31 +693,35 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
             onMouseLeave={onMouseUpCanvas}
           >
             <GridOverlay w={Math.max(1, tpl.width)} h={Math.max(1, tpl.height)} />
-            {tpl.textLayers.map((L) => (
-              <div
-                key={L.id}
-                className={`absolute select-none ${selectedId === L.id ? "ring-2 ring-sky-500" : ""}`}
-                style={{ left: L.x, top: L.y, width: Math.max(1, L.width) }}
-                onMouseDown={(e) => onMouseDownLayer(e, L.id)}
-                onClick={() => setSelectedId(L.id)}
-              >
+            {tpl.textLayers.map((L) => {
+              const fontCss = FONT_OPTIONS.find(f => f.key === L.font)?.css ?? FONT_OPTIONS[0].css;
+              return (
                 <div
-                  className="px-1 py-0.5"
-                  style={{
-                    fontSize: Math.max(1, L.fontSize),
-                    color: L.color,
-                    fontWeight: L.weight,
-                    fontStyle: L.italic ? "italic" : "normal",
-                    textAlign: L.align as any,
-                    textTransform: L.uppercase ? "uppercase" : "none",
-                    textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
-                    lineHeight: 1.1, whiteSpace: "pre-wrap", wordBreak: "break-word"
-                  }}
+                  key={L.id}
+                  className={`absolute select-none ${selectedId === L.id ? "ring-2 ring-sky-500" : ""}`}
+                  style={{ left: L.x, top: L.y, width: Math.max(1, L.width) }}
+                  onMouseDown={(e) => onMouseDownLayer(e, L.id)}
+                  onClick={() => setSelectedId(L.id)}
                 >
-                  {L.text}
+                  <div
+                    className="px-1 py-0.5"
+                    style={{
+                      fontFamily: fontCss,
+                      fontSize: Math.max(1, L.fontSize),
+                      color: L.color,
+                      fontWeight: L.weight,
+                      fontStyle: L.italic ? "italic" : "normal",
+                      textAlign: L.align as any,
+                      textTransform: L.uppercase ? "uppercase" : "none",
+                      textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
+                      lineHeight: 1.1, whiteSpace: "pre-wrap", wordBreak: "break-word"
+                    }}
+                  >
+                    {L.text}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -750,7 +733,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
             <div className="text-xl font-bold">文字層</div>
             <button className="px-3 py-1.5 rounded-xl shadow bg-sky-600 text-white" onClick={addLayer}>新增文字層</button>
           </div>
-        {tpl.textLayers.length === 0 ? (
+          {tpl.textLayers.length === 0 ? (
             <div className="text-slate-500 text-sm">尚無文字層</div>
           ) : (
             <ul className="space-y-1 max-h-64 overflow-auto">
@@ -808,6 +791,7 @@ function GridOverlay({ w, h }: { w: number; h: number }) {
   );
 }
 
+/* ---------------- 🆕 LayerEditor：加入字體選擇 ---------------- */
 function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: TextLayer) => void; }) {
   return (
     <div className="space-y-3">
@@ -815,10 +799,29 @@ function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: Text
         <label className="block text-sm mb-1">圖層名稱</label>
         <input className="w-full border rounded-xl px-3 py-2" value={layer.label} onChange={(e)=>onChange({ ...layer, label: e.target.value })}/>
       </div>
+
       <div>
         <label className="block text-sm mb-1">文字內容（可換行）</label>
         <textarea className="w-full border rounded-xl px-3 py-2 min-h-24" value={layer.text} onChange={(e)=>onChange({ ...layer, text: e.target.value })}/>
       </div>
+
+      {/* 字體選擇 */}
+      <div>
+        <label className="block text-sm mb-1">字體</label>
+        <select
+          className="w-full border rounded-xl px-3 py-2"
+          value={layer.font ?? "noto-sans-tc"}
+          onChange={(e)=>onChange({ ...layer, font: e.target.value })}
+        >
+          {FONT_OPTIONS.map(f => (
+            <option key={f.key} value={f.key}>{f.label}</option>
+          ))}
+        </select>
+        <div className="mt-1 text-xs text-slate-500">
+          已內建：GenYoGothicTW（本地 .ttc）/ Noto Sans TC / Noto Serif TC / Roboto / Montserrat
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm mb-1">X</label>
@@ -829,6 +832,7 @@ function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: Text
           <input type="number" className="w-full border rounded-xl px-3 py-2" value={layer.y} onChange={(e)=>onChange({ ...layer, y: parseInt(e.target.value||"0")||0 })}/>
         </div>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm mb-1">寬度（px）</label>
@@ -839,6 +843,7 @@ function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: Text
           <input type="number" className="w-full border rounded-xl px-3 py-2" value={layer.fontSize} onChange={(e)=>onChange({ ...layer, fontSize: parseInt(e.target.value||"0")||0 })}/>
         </div>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-sm mb-1">顏色</label>
@@ -854,6 +859,7 @@ function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: Text
           </select>
         </div>
       </div>
+
       <div>
         <label className="block text-sm mb-1">對齊</label>
         <div className="flex gap-2">
@@ -862,6 +868,7 @@ function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: Text
           ))}
         </div>
       </div>
+
       <div className="grid grid-cols-3 gap-2">
         <label className="inline-flex items-center gap-2">
           <input type="checkbox" checked={!!layer.uppercase} onChange={(e)=>onChange({ ...layer, uppercase: e.target.checked })}/>
