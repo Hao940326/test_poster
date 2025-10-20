@@ -9,109 +9,107 @@ import {
 } from "@/lib/dbApi";
 
 /* ------------------- 🔐 登入頂欄（只留 Google） ------------------- */
+function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: any|null)=>void }) {
+  const [user, setUser] = React.useState<any>(null);
+  const [msg, setMsg] = React.useState<string | null>(null);
 
-  function LoginBar({ supabase, onUser }: { supabase: SupabaseClient; onUser: (u: any|null)=>void }) {
-    const [user, setUser] = React.useState<any>(null);
-    const [msg, setMsg] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    let unsub = () => {};
+    // 用同步函式包住 async，確保 cleanup 能正確返回
+    const run = async () => {
+      // 1) 先抓 session
+      const { data: { session } } = await supabase.auth.getSession();
+      const u = session?.user ?? null;
+      setUser(u);
+      onUser(u);
 
-    React.useEffect(() => {
-      let unsub = () => {};
-      // 用同步函式包住 async，確保 cleanup 能正確返回
-      const run = async () => {
-        // 1) 先抓 session
-        const { data: { session } } = await supabase.auth.getSession();
-        const u = session?.user ?? null;
-        setUser(u);
-        onUser(u);
+      // 2) 檢查 allowed_users —— ❗只要「查不到」或「錯誤」，都視為拒絕
+      if (u?.email) {
+        const email = u.email.toLowerCase();
+        const { data, error } = await supabase
+          .from("allowed_users")
+          .select("email")
+          .eq("email", email)
+          .maybeSingle();
 
-        // 2) 檢查 allowed_users —— ❗只要「查不到」或「錯誤」，都視為拒絕
-        if (u?.email) {
-          const email = u.email.toLowerCase();
-          const { data, error } = await supabase
-            .from("allowed_users")
-            .select("email")
-            .eq("email", email)
-            .maybeSingle();
+        if (error || !data) {
+          // 👉 這裡與原本不同：出錯也當不允許
+          await supabase.auth.signOut();
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "denied_reason",
+              error ? `allowed_users 查詢失敗：${error.message}` : `不在允許名單：${email}`
+            );
+            window.location.href = "/access-denied";
+          }
+          return; // 直接結束，不要往下訂閱
+        }
+      }
 
-          if (error || !data) {
-            // 👉 這裡與原本不同：出錯也當不允許
-            await supabase.auth.signOut();
-            if (typeof window !== "undefined") {
-              localStorage.setItem(
-                "denied_reason",
-                error ? `allowed_users 查詢失敗：${error.message}` : `不在允許名單：${email}`
-              );
-              window.location.href = "/access-denied";
-            }
-            return; // 直接結束，不要往下訂閱
+      // 3) 訂閱登入狀態變化
+      const { data: sub } = supabase.auth.onAuthStateChange(async (_evt, session) => {
+        const u2 = session?.user ?? null;
+        setUser(u2);
+        onUser(u2);
+
+        if (!u2?.email) return;
+
+        const email2 = u2.email.toLowerCase();
+        const { data, error } = await supabase
+          .from("allowed_users")
+          .select("email")
+          .eq("email", email2)
+          .maybeSingle();
+
+        // 👉 同樣：出錯或查不到 = 拒絕
+        if (error || !data) {
+          await supabase.auth.signOut();
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "denied_reason",
+              error ? `allowed_users 查詢失敗：${error.message}` : `不在允許名單：${email2}`
+            );
+            window.location.href = "/access-denied";
           }
         }
-
-        // 3) 訂閱登入狀態變化
-        const { data: sub } = supabase.auth.onAuthStateChange(async (_evt, session) => {
-          const u2 = session?.user ?? null;
-          setUser(u2);
-          onUser(u2);
-
-          if (!u2?.email) return;
-
-          const email2 = u2.email.toLowerCase();
-          const { data, error } = await supabase
-            .from("allowed_users")
-            .select("email")
-            .eq("email", email2)
-            .maybeSingle();
-
-          // 👉 同樣：出錯或查不到 = 拒絕
-          if (error || !data) {
-            await supabase.auth.signOut();
-            if (typeof window !== "undefined") {
-              localStorage.setItem(
-                "denied_reason",
-                error ? `allowed_users 查詢失敗：${error.message}` : `不在允許名單：${email2}`
-              );
-              window.location.href = "/access-denied";
-            }
-          }
-        });
-
-        unsub = () => sub.subscription.unsubscribe();
-      };
-
-      run();
-      return () => unsub();
-    }, [supabase, onUser]);
-
-    async function loginGoogle() {
-      const redirect = "/studio";
-      const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo, queryParams: { prompt: "select_account" } },
       });
-      if (error) setMsg(error.message);
-    }
 
-    async function logout() {
-      await supabase.auth.signOut();
-      setMsg(null);
-    }
+      unsub = () => sub.subscription.unsubscribe();
+    };
 
-    return (
-      <div className="flex items-center gap-3">
-        {user ? (
-          <>
-            <span className="text-sm text-slate-600">已登入：<b>{user.email ?? user.id}</b></span>
-            <button className="px-3 py-1.5 rounded border" onClick={logout}>登出</button>
-          </>
-        ) : (
-          <button className="px-3 py-1.5 rounded border" onClick={loginGoogle}>Google 登入</button>
-        )}
-        {msg && <span className="text-xs text-slate-500">{msg}</span>}
-      </div>
-    );
+    run();
+    return () => unsub();
+  }, [supabase, onUser]);
+
+  async function loginGoogle() {
+    const redirect = "/studio";
+    const redirectTo = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo, queryParams: { prompt: "select_account" } },
+    });
+    if (error) setMsg(error.message);
   }
 
+  async function logout() {
+    await supabase.auth.signOut();
+    setMsg(null);
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      {user ? (
+        <>
+          <span className="text-sm text-slate-600">已登入：<b>{user.email ?? user.id}</b></span>
+          <button className="px-3 py-1.5 rounded border" onClick={logout}>登出</button>
+        </>
+      ) : (
+        <button className="px-3 py-1.5 rounded border" onClick={loginGoogle}>Google 登入</button>
+      )}
+      {msg && <span className="text-xs text-slate-500">{msg}</span>}
+    </div>
+  );
+}
 
 /* ------------------- 🔧 小工具 ------------------- */
 // File → DataURL
@@ -133,7 +131,7 @@ function getErrMsg(e: any): string {
   if (e.data?.message) return e.data.message;
   try { return JSON.stringify(e); } catch { return String(e); }
 }
-// 分享用編碼
+// 分享用編碼（目前未使用，保留）
 function encodeTpl(tpl: any) {
   const str = JSON.stringify(tpl);
   const b64 = btoa(unescape(encodeURIComponent(str)));
@@ -158,7 +156,7 @@ type TplVM = {
   height: number;
   bgUrl: string;        // 畫布背景（public URL 或 dataURL）
   textLayers: TextLayer[];
-  iconUrl?: string;     // 🆕 icon 公開網址
+  iconUrl?: string;     // icon 公開網址
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -198,17 +196,44 @@ export default function StudioPage() {
   );
 }
 
-/* ---------------- A 端主元件 ---------------- */
+/* ===================== AdminTemplateEditor（含可縮放畫布） ===================== */
+
+type ZoomMode = number | "fit";
+function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
+
 function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; user: any | null; }) {
   const [allTpls, setAllTpls] = useState<TplVM[]>([]);
   const [tpl, setTpl] = useState<TplVM>(() => DEFAULT_TPL);
   const [selectedId, setSelectedId] = useState<string | null>(DEFAULT_TPL.textLayers[0].id);
   const [loading, setLoading] = useState(false);
 
+  // 🔍 縮放狀態
+  const [zoom, setZoom] = useState<ZoomMode>("fit");
+  const [scale, setScale] = useState(1);
+  const canvasOuterRef = useRef<HTMLDivElement | null>(null);
+
   const selected = useMemo(
     () => tpl.textLayers.find((t) => t.id === selectedId) || null,
     [tpl, selectedId]
   );
+
+  // 依容器大小自動計算「整幅置入」倍率
+  useEffect(() => {
+    if (zoom !== "fit") { setScale(typeof zoom === "number" ? zoom : 1); return; }
+    const el = canvasOuterRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver(() => {
+      const pad = 16;
+      const box = el.getBoundingClientRect();
+      const availW = Math.max(1, box.width - pad);
+      const availH = Math.max(1, box.height - pad);
+      const s = Math.min(availW / Math.max(1, tpl.width), availH / Math.max(1, tpl.height));
+      setScale(clamp(s, 0.05, 3));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [zoom, tpl.width, tpl.height]);
 
   // 載清單
   useEffect(() => {
@@ -221,7 +246,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
           width: r.width, height: r.height,
           textLayers: r.text_layers,
           bgUrl: r.bg_path ? toPublicUrl(r.bg_path) : "",
-          iconUrl: r.icon_path ? toPublicUrl(r.icon_path) : "", // 🆕
+          iconUrl: r.icon_path ? toPublicUrl(r.icon_path) : "",
         })));
       } catch (e: any) {
         console.group("讀取模板失敗");
@@ -234,14 +259,15 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
     })();
   }, []);
 
-  // 鍵盤微調
+  // 鍵盤微調（保持原本行為）
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!selected) return;
+      const sel = selected;
+      if (!sel) return;
       if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) {
         e.preventDefault();
         const d = e.shiftKey ? 10 : 1;
-        const next = { ...selected };
+        const next = { ...sel };
         if (e.key === "ArrowUp") next.y -= d;
         if (e.key === "ArrowDown") next.y += d;
         if (e.key === "ArrowLeft") next.x -= d;
@@ -249,7 +275,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         updateLayer(next);
       }
       if (e.key === "Delete") {
-        setTpl(o => ({ ...o, textLayers: o.textLayers.filter(l => l.id !== selected.id) }));
+        setTpl(o => ({ ...o, textLayers: o.textLayers.filter(l => l.id !== sel.id) }));
         setSelectedId(null);
       }
     };
@@ -267,22 +293,26 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
     setTpl(o => ({ ...o, textLayers: o.textLayers.map(l => l.id === next.id ? next : l) }));
   }
 
-  // 拖曳
+  // 拖曳（依縮放倍率換算原始座標）
   const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null);
   function onMouseDownLayer(e: React.MouseEvent, id: string) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    dragRef.current = { id, dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    const dx = (e.clientX - rect.left) / scale;
+    const dy = (e.clientY - rect.top) / scale;
+    dragRef.current = { id, dx, dy };
     setSelectedId(id);
   }
   function onMouseMoveCanvas(e: React.MouseEvent) {
     if (!dragRef.current) return;
-    const { id, dx, dy } = dragRef.current;
     const host = e.currentTarget as HTMLElement;
     const r = host.getBoundingClientRect();
-    const x = e.clientX - r.left - dx;
-    const y = e.clientY - r.top - dy;
+    const { id, dx, dy } = dragRef.current;
+
+    const xRaw = (e.clientX - r.left) / scale - dx;
+    const yRaw = (e.clientY - r.top) / scale - dy;
+
     const L = tpl.textLayers.find(t => t.id === id);
-    if (L) updateLayer({ ...L, x, y });
+    if (L) updateLayer({ ...L, x: Math.round(xRaw), y: Math.round(yRaw) });
   }
   function onMouseUpCanvas() { dragRef.current = null; }
 
@@ -300,7 +330,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         width: r.width, height: r.height,
         textLayers: r.text_layers,
         bgUrl: r.bg_path ? toPublicUrl(r.bg_path) : "",
-        iconUrl: r.icon_path ? toPublicUrl(r.icon_path) : "", // 🆕
+        iconUrl: r.icon_path ? toPublicUrl(r.icon_path) : "",
       })));
     } catch (e: any) {
       console.error(e);
@@ -345,7 +375,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         ...o,
         id: saved.id,
         bgUrl: saved.bg_path ? toPublicUrl(saved.bg_path) : o.bgUrl,
-        iconUrl: saved.icon_path ? toPublicUrl(saved.icon_path) : o.iconUrl, // 🆕
+        iconUrl: saved.icon_path ? toPublicUrl(saved.icon_path) : o.iconUrl,
       }));
       await refreshList();
       alert("已儲存到 Supabase");
@@ -386,7 +416,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         ...o,
         id: saved.id,
         bgUrl: saved.bg_path ? toPublicUrl(saved.bg_path) : o.bgUrl,
-        iconUrl: saved.icon_path ? toPublicUrl(saved.icon_path) : o.iconUrl, // 🆕
+        iconUrl: saved.icon_path ? toPublicUrl(saved.icon_path) : o.iconUrl,
       }));
       await refreshList();
       alert("已覆蓋（Supabase）");
@@ -413,7 +443,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
           height: exist.height,
           textLayers: exist.text_layers,
           bgUrl: exist.bg_path ? toPublicUrl(exist.bg_path) : "",
-          iconUrl: exist.icon_path ? toPublicUrl(exist.icon_path) : "", // 🆕
+          iconUrl: exist.icon_path ? toPublicUrl(exist.icon_path) : "",
         });
         setSelectedId(exist.text_layers[0]?.id ?? null);
       }
@@ -443,19 +473,19 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
     }
   }
 
-  // 分享連結資料
+  // 分享連結資料（目前未使用，保留）
   function tplToShare(t: TplVM) {
     return { width: t.width, height: t.height, bgUrl: t.bgUrl, textLayers: t.textLayers };
   }
 
-  // 🆕 單筆上傳 icon（處理中文檔名、安全路徑、寫回 DB）
+  // 單筆上傳 icon
   async function uploadIcon(file: File) {
     await ensureLogin();
     const sb = getSupabase();
     const { data: { user } } = await sb!.auth.getUser();
     if (!user) throw new Error("尚未登入");
 
-    // 確保有模板 id（若沒有先建立空殼）
+    // 確保有模板 id
     let tplId = tpl.id;
     if (!tplId) {
       tplId = crypto.randomUUID();
@@ -470,7 +500,6 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
       setTpl(o => ({ ...o, id: tplId! }));
     }
 
-    // 副檔名：用 mime 決定；避免中文檔名
     const ext = file.type === "image/jpeg" ? "jpg"
               : file.type === "image/webp" ? "webp"
               : "png";
@@ -559,7 +588,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
             <input type="file" accept="image/*" onChange={(e) => onPickBg(e.target.files?.[0])} />
           </div>
 
-          {/* 🆕 Icon 上傳 */}
+          {/* Icon 上傳 */}
           <div className="mt-4">
             <div className="block text-sm font-semibold mb-1">Icon 上傳</div>
             <div className="w-full border rounded-xl p-2 text-sm bg-slate-50">
@@ -635,20 +664,54 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         </div>
       </div>
 
-      {/* 中欄：畫布 */}
+      {/* 中欄：畫布（可縮放 + 整幅置入） */}
       <div className="col-span-6">
-        <div className="text-xl font-bold mb-2">畫布（允許 0；渲染時最小 1 避免崩版）</div>
-        <div className="relative rounded-2xl shadow bg-white overflow-auto p-4" style={{ maxHeight: "85vh" }}>
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-xl font-bold">畫布預覽</div>
+          <div className="flex items-center gap-2">
+            <button
+              className={`px-2 py-1 rounded border ${zoom==="fit" ? "bg-slate-900 text-white" : ""}`}
+              onClick={() => setZoom("fit")}
+              title="整幅置入"
+            >
+              整幅
+            </button>
+            {[0.25, 0.5, 0.75, 1].map(v => (
+              <button
+                key={v}
+                className={`px-2 py-1 rounded border ${zoom===v ? "bg-slate-900 text-white" : ""}`}
+                onClick={() => setZoom(v)}
+                title={`${Math.round(v*100)}%`}
+              >
+                {Math.round(v*100)}%
+              </button>
+            ))}
+            <span className="text-sm text-slate-500 ml-2">
+              目前：{Math.round(scale * 100)}%
+            </span>
+          </div>
+        </div>
+
+        <div
+          ref={canvasOuterRef}
+          className="relative rounded-2xl shadow bg-white overflow-auto p-4"
+          style={{ maxHeight: "85vh" }}
+        >
+          {/* 這個容器負責縮放（不改內部座標） */}
           <div
             className="relative mx-auto border bg-white"
             style={{
               width: Math.max(1, tpl.width),
               height: Math.max(1, tpl.height),
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
               backgroundImage: `url(${tpl.bgUrl})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
             }}
-            onMouseMove={onMouseMoveCanvas} onMouseUp={onMouseUpCanvas} onMouseLeave={onMouseUpCanvas}
+            onMouseMove={onMouseMoveCanvas}
+            onMouseUp={onMouseUpCanvas}
+            onMouseLeave={onMouseUpCanvas}
           >
             <GridOverlay w={Math.max(1, tpl.width)} h={Math.max(1, tpl.height)} />
             {tpl.textLayers.map((L) => (
@@ -656,7 +719,8 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
                 key={L.id}
                 className={`absolute select-none ${selectedId === L.id ? "ring-2 ring-sky-500" : ""}`}
                 style={{ left: L.x, top: L.y, width: Math.max(1, L.width) }}
-                onMouseDown={(e) => onMouseDownLayer(e, L.id)} onClick={() => setSelectedId(L.id)}
+                onMouseDown={(e) => onMouseDownLayer(e, L.id)}
+                onClick={() => setSelectedId(L.id)}
               >
                 <div
                   className="px-1 py-0.5"
@@ -686,7 +750,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
             <div className="text-xl font-bold">文字層</div>
             <button className="px-3 py-1.5 rounded-xl shadow bg-sky-600 text-white" onClick={addLayer}>新增文字層</button>
           </div>
-          {tpl.textLayers.length === 0 ? (
+        {tpl.textLayers.length === 0 ? (
             <div className="text-slate-500 text-sm">尚無文字層</div>
           ) : (
             <ul className="space-y-1 max-h-64 overflow-auto">
