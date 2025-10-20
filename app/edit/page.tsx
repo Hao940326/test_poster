@@ -152,7 +152,7 @@ export default function BPage() {
         }));
         setTemplates(mapped);
 
-        // 初次顯示公司 Logo（1080x1528 為預設畫布；若你有固定別的尺寸可調整）
+        // 初次顯示公司 Logo
         const W = 1080,
           H = 1528,
           S = 300;
@@ -282,7 +282,7 @@ export default function BPage() {
   };
 
   /* --------- 同系列模板切換 --------- */
-  const siblings = useMemo(() => {
+  const siblings = React.useMemo(() => {
     if (!picked) return [] as TemplateRowLite[];
     const bn = baseName(picked.name);
     const same = templates.filter((t) => baseName(t.name) === bn);
@@ -295,7 +295,7 @@ export default function BPage() {
   }, [picked, templates]);
 
   /* --------- 右側選課（只顯示代表） --------- */
-  const grouped = useMemo(() => {
+  const grouped = React.useMemo(() => {
     const reps = representativesByBase(templates);
     const map = new Map<string, TemplateRowLite[]>();
     for (const t of reps) {
@@ -313,9 +313,15 @@ export default function BPage() {
 
   /* ---------------- 匯出：PNG / PDF ---------------- */
   async function getStageCanvas(scaleFactor = 3) {
+    // ✅ 先等字體載入，避免 html2canvas fallback 到預設字體
+    if ((document as any).fonts?.ready) {
+      await (document as any).fonts.ready;
+    }
+
     const stage =
       stageWrapRef.current?.querySelector<HTMLDivElement>("[data-stage]");
     if (!stage) return null;
+
     const html2canvas = (await import("html2canvas")).default;
     const canvas = await html2canvas(stage, {
       scale: scaleFactor,
@@ -334,6 +340,8 @@ export default function BPage() {
           cloned.style.transformOrigin = "top left";
           cloned.style.width = `${w}px`;
           cloned.style.height = `${h}px`;
+          // ✅ 再保險一次：強制字體
+          cloned.style.fontFamily = `"GenYoGothicTW","Noto Sans TC",sans-serif`;
         }
       },
     });
@@ -387,7 +395,7 @@ export default function BPage() {
 
   /* ---------------- Render ---------------- */
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white font-[GenYoGothicTW]">
       <div className="max-w-[1180px] mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
         {/* 左：預覽區 */}
         <div className="lg:col-span-5">
@@ -418,6 +426,8 @@ export default function BPage() {
                     : "none",
                   backgroundSize: "cover",
                   backgroundPosition: "center",
+                  // ✅ 強制字體（畫布內）
+                  fontFamily: `"GenYoGothicTW","Noto Sans TC",sans-serif`,
                 }}
               >
                 {/* 文字層：選了模板才顯示 */}
