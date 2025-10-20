@@ -82,7 +82,7 @@ const FIELD_KEYS = [
 
 const CATEGORY_STYLES: Record<string, { dot: string; pill: string }> = {
   "創意手作": { dot: "bg-[#F2A7AF]", pill: "bg-[#F2A7AF] text-white" },
-  "金智挑戰": { dot: "bg-[#EFAB67]", pill: "bg-[#EFAB67] text-white" },
+  "益智挑戰": { dot: "bg-[#EFAB67]", pill: "bg-[#EFAB67] text-white" },
   "STEAM啟航": { dot: "bg-[#799DBF]", pill: "bg-[#799DBF] text-white" },
   "律動節奏": { dot: "bg-[#D389C2]", pill: "bg-[#D389C2] text-white" },
   其他: { dot: "bg-slate-300", pill: "bg-slate-500 text-white" },
