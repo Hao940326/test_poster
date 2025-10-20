@@ -91,7 +91,7 @@ const CATEGORY_STYLES: Record<string, { dot: string; pill: string }> = {
 function guessCategory(name: string): string {
   name = baseName(name);
   if (/3D筆|拼豆|黏土|水珠|氣球/i.test(name)) return "創意手作";
-  if (/卡牌|桌遊|魔方|魔術|吸管|骨牌/i.test(name)) return "金智挑戰";
+  if (/卡牌|桌遊|魔方|魔術|吸管|骨牌/i.test(name)) return "益智挑戰";
   if (/機械|科學|昆蟲|AI|積木/i.test(name)) return "STEAM啟航";
   if (/疊杯|卡林巴|舞蹈|體適能/i.test(name)) return "律動節奏";
   return "其他";
@@ -696,10 +696,10 @@ export default function BPage() {
           <div className="mt-2 flex flex-wrap gap-3">
             <button
               onClick={downloadPNG}
-              className="px-6 py-3 rounded-full bg-slate-800 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
+              className="px-6 py-3 rounded-full bg-black text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
             >
               下載 PNG 圖檔
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none">
                 <path d="M12 16l4-5h-3V4h-2v7H8l4 5zm8 2H4v2h16v-2z"/>
               </svg>
             </button>
@@ -729,7 +729,7 @@ export default function BPage() {
       </div>
 
       <footer className="mt-10 bg-[#FFC840] text-[11px] sm:text-[12px] text-white/90 py-3 text-center tracking-wider px-3">
-        國王才藝 KING'S TALENT ｜本平台模板由國王才藝原創設計，僅限才藝機構之招生宣傳使用，請勿轉售、重製或作商業用途。
+        國王才藝 KING'S TALENT ｜本平台模板由國王才藝原創設計，僅限補教機構之招生宣傳使用，請勿轉售、重製或作商業用途。
       </footer>
     </div>
   );

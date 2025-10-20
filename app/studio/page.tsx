@@ -262,7 +262,7 @@ export default function StudioPage() {
   );
 }
 
-/* ===================== AdminTemplateEditor（含可縮放 + 多字體） ===================== */
+/* ===================== AdminTemplateEditor（含可縮放 + 多字體 + ICON 上傳） ===================== */
 
 type ZoomMode = number | "fit";
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
@@ -389,6 +389,27 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
     setTpl(o => ({ ...o, bgUrl: url }));
   }
 
+  /* ---------------- 🆕 ICON：上傳/預覽 ---------------- */
+  async function onPickIcon(file?: File) {
+    if (!file) return;
+    const url = await fileToDataUrl(file);
+    setTpl(o => ({ ...o, iconUrl: url })); // 先用 DataURL 預覽
+  }
+  async function uploadIconDataUrlToStorage(id: string, dataUrl: string) {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const isSvg = blob.type.includes("svg");
+    const ext = isSvg ? "svg" : "png";
+    const path = `icons/icon-${id}.${ext}`;
+
+    const { error } = await supabase
+      .storage
+      .from("poster-assets")
+      .upload(path, blob, { upsert: true, contentType: blob.type });
+    if (error) throw error;
+    return path; // icon_path
+  }
+
   async function refreshList() {
     try {
       const rows = await listTemplates();
@@ -421,18 +442,23 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         bg_path = await uploadBgDataUrl(id, tpl.bgUrl);
       }
 
-      const row = {
+      // 🆕 ICON（dataURL -> Storage）
+      let icon_path: string | undefined;
+      if (tpl.iconUrl && tpl.iconUrl.startsWith("data:")) {
+        icon_path = await uploadIconDataUrlToStorage(id, tpl.iconUrl);
+      }
+
+      const saved = await upsertTemplate({
         id,
         name,
         width: tpl.width,
         height: tpl.height,
         text_layers: tpl.textLayers,
-        bg_path,
+        ...(bg_path ? { bg_path } : {}),
+        ...(icon_path ? { icon_path } : {}),
         is_published: true,
         owner: user?.id ?? null,
-      };
-
-      const saved = await upsertTemplate(row);
+      });
 
       setTpl(o => ({
         ...o,
@@ -443,9 +469,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
       await refreshList();
       alert("已儲存到 Supabase");
     } catch (e: any) {
-      console.group("儲存失敗");
-      console.dir(e);
-      console.groupEnd();
+      console.group("儲存失敗"); console.dir(e); console.groupEnd();
       alert(getErrMsg(e));
     } finally {
       setLoading(false);
@@ -465,6 +489,12 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         bg_path = await uploadBgDataUrl(id, tpl.bgUrl);
       }
 
+      // 🆕 ICON（dataURL -> Storage）
+      let icon_path: string | undefined;
+      if (tpl.iconUrl && tpl.iconUrl.startsWith("data:")) {
+        icon_path = await uploadIconDataUrlToStorage(id, tpl.iconUrl);
+      }
+
       const saved = await upsertTemplate({
         id,
         name,
@@ -472,6 +502,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         height: tpl.height,
         text_layers: tpl.textLayers,
         ...(bg_path ? { bg_path } : {}),
+        ...(icon_path ? { icon_path } : {}),
         is_published: true,
       });
 
@@ -484,9 +515,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
       await refreshList();
       alert("已覆蓋（Supabase）");
     } catch (e: any) {
-      console.group("覆蓋失敗");
-      console.dir(e);
-      console.groupEnd();
+      console.group("覆蓋失敗"); console.dir(e); console.groupEnd();
       alert(getErrMsg(e));
     } finally {
       setLoading(false);
@@ -594,9 +623,42 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
               <input type="number" className="w-full border rounded-xl px-3 py-2" value={tpl.height} onChange={(e) => setTpl({ ...tpl, height: parseInt(e.target.value || "0") || 0 })} />
             </div>
           </div>
+
+          {/* 背景圖 */}
           <div className="w-full border rounded-xl p-2 text-sm bg-slate-50">
             <label className="block text-sm">背景圖</label>
             <input type="file" accept="image/*" onChange={(e) => onPickBg(e.target.files?.[0])} />
+          </div>
+
+          {/* 🆕 ICON 上傳區塊 */}
+          <div className="w-full border rounded-xl p-2 text-sm bg-slate-50 mt-3">
+            <label className="block text-sm">ICON（課程縮圖 / 代表圖）</label>
+            <div className="flex items-center gap-3">
+              {tpl.iconUrl ? (
+                <img
+                  src={tpl.iconUrl}
+                  alt="icon preview"
+                  className="w-12 h-12 object-contain border rounded"
+                />
+              ) : (
+                <div className="w-12 h-12 grid place-items-center border rounded text-slate-400">—</div>
+              )}
+              <input
+                type="file"
+                accept="image/*,.svg"
+                onChange={(e) => onPickIcon(e.target.files?.[0])}
+              />
+              {tpl.iconUrl && (
+                <button
+                  className="px-2 py-1 rounded border"
+                  onClick={() => setTpl(o => ({ ...o, iconUrl: "" }))}
+                >
+                  移除
+                </button>
+              )}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+            </div>
           </div>
         </div>
 
@@ -859,7 +921,6 @@ function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: Text
             <option value={600}>600（Semibold）</option>
             <option value={700}>700（Bold）</option>
             <option value={900}>900（Heavy）</option>
-
           </select>
         </div>
       </div>
