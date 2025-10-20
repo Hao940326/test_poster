@@ -673,7 +673,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
           <button
             className="w-full px-3 py-2 rounded-xl shadow bg-indigo-600 text-white"
             onClick={() => {
-              window.location.href = "https://test-poster-7dyz.vercel.app/edit";//雲端
+              window.location.href = "https://test-poster.vercel.app/edit";//雲端
               //window.location.href = "http://localhost:3000/edit";//本機
             }}
           >
