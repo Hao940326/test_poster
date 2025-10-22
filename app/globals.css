@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
-/* ---------------- 🎨 基本色彩變數 ---------------- */
+/* ---------------- 🎨 亮色主題（預設） ---------------- */
 :root {
   --background: #ffffff;
   --foreground: #171717;
 
-  /* 也準備一些常用語意變數（亮色） */
-  --surface: #ffffff;
-  --muted: #f6f6f6;
-  --border: #e6e6e6;
-  --link: #2563eb;  /* tailwind blue-600 */
-  --ring: #3b82f6;  /* focus outline */
+  --surface: #ffffff;  /* 卡片/面板底 */
+  --muted:   #f6f6f6;  /* 次要底/hover */
+  --panel:   #f0f0f0;  /* 輸入框/按鈕底 */
+  --border:  #e6e6e6;  /* 邊框 */
+  --link:    #2563eb;  /* 連結/主色 */
+  --ring:    #3b82f6;  /* 焦點外框 */
 }
 
 /* Tailwind v4 @theme inline 變數映射 */
@@ -21,142 +21,124 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* ---------------- 🌙 調亮的深色模式（保留自動切換） ---------------- */
+/* ---------------- 🌙 暗色主題（高對比可讀） ---------------- */
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* 比純黑柔和一點，文字也更亮，對比更清楚 */
-    --background: #1a1a1a;
-    --foreground: #f5f5f5;
-
-    --surface: #242424; /* 卡片/面板底 */
-    --muted: #1f1f1f;   /* 次要區塊/hover底 */
-    --border: #3a3a3a;  /* 邊框 */
-    --link: #60a5fa;    /* 深色下的連結色 */
-    --ring: #60a5fa;    /* focus outline */
-  }
-
-  body {
-    background-color: var(--background);
-    color: var(--foreground);
-  }
-
-  /* 元件基礎：卡片、面板、編輯器、輸入框等 */
-  .card, .panel, .editor {
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-  }
-
   input, textarea, select {
-    background-color: var(--muted);
-    color: var(--foreground);
-    border: 1px solid var(--border);
+    background-color: #111 !important; /* 深灰底 */
+    color: #f8f8f8 !important;         /* 亮灰字，比純白柔和 */
+    border: 1px solid #333 !important;
   }
 
-  a {
-    color: var(--link);
+  /* placeholder 文字也調亮一點 */
+  ::placeholder {
+    color: #cfcfcf !important;
+    opacity: 1 !important;
   }
 
-  button {
-    background-color: var(--muted);
-    color: var(--foreground);
-    border: 1px solid var(--border);
-  }
-  button:hover {
-    background-color: #2d2d2d;
-  }
-
-  /* 焦點可見性（鍵盤導覽） */
-  :is(button, a, input, textarea, select):focus-visible {
-    outline: 2px solid var(--ring);
+  /* 針對被選中的輸入框，給一點藍色外框 */
+  input:focus, textarea:focus, select:focus {
+    outline: 2px solid #60a5fa !important;
     outline-offset: 2px;
   }
+
+  /* 如果按鈕或其他可互動項用了同樣底色，也統一調亮 */
+  button {
+    background-color: #1a1a1a !important;
+    color: #fff !important;
+  }
 }
+
 
 /* ---------------- 🈶 GenYoGothicTW (from Supabase Storage) ---------------- */
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-EL.ttc")
-       format("truetype");
-  font-weight: 200;
-  font-style: normal;
-  font-display: swap;
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-EL.ttc") format("truetype");
+  font-weight: 200; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-L.ttc")
-       format("truetype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-L.ttc") format("truetype");
+  font-weight: 300; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-N.ttc")
-       format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-N.ttc") format("truetype");
+  font-weight: 400; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-M.ttc")
-       format("truetype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-M.ttc") format("truetype");
+  font-weight: 500; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-R.ttc")
-       format("truetype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-R.ttc") format("truetype");
+  font-weight: 600; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-B.ttc")
-       format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-B.ttc") format("truetype");
+  font-weight: 700; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-H.ttc")
-       format("truetype");
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
+  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-H.ttc") format("truetype");
+  font-weight: 800; font-style: normal; font-display: swap;
 }
 
-/* ---------------- 🌈 全域樣式 ---------------- */
+/* ---------------- 🌈 全域基底 ---------------- */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: "GenYoGothicTW", "Noto Sans TC", Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* 常用結構的預設外觀（亮色也生效） */
+::selection { background: var(--link); color: #fff; }
+:is(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* 常見容器 */
 .card, .panel, .editor {
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: 0.75rem;
 }
 
-/* 表單 & 交互 */
-input, textarea, select, button {
-  font: inherit;
+/* 控件 */
+button, .btn {
+  background-color: var(--panel);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+button:hover, .btn:hover { background-color: color-mix(in oklab, var(--panel), #000 8%); }
+
+input, textarea, select {
+  background-color: var(--panel);
+  color: var(--foreground);
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
 }
 
-/* 連結 & 焦點 */
+/* 連結 */
 a { color: var(--link); }
-:is(a, button, input, textarea, select):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+
+/* 區塊/列表容器 */
+.scroll-area, .template-list {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
 }
 
-/* ---------------- 🧩（可選）手動覆蓋：之後若要提供切換，加入 data-theme 即可 ---------------- */
-/* [data-theme="light"] :root { --background: #ffffff; --foreground: #171717; } */
-/* [data-theme="dark"]  :root { --background: #1a1a1a; --foreground: #f5f5f5; --surface:#242424; --muted:#1f1f1f; --border:#3a3a3a; --link:#60a5fa; --ring:#60a5fa; } */
+/* 頂欄 */
+header, nav {
+  background-color: color-mix(in oklab, var(--background), #000 5%);
+  color: var(--foreground);
+}

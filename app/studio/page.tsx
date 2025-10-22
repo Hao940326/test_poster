@@ -879,9 +879,6 @@ function LayerEditor({ layer, onChange }: { layer: TextLayer; onChange: (l: Text
             <option key={f.key} value={f.key}>{f.label}</option>
           ))}
         </select>
-        <div className="mt-1 text-xs text-slate-500">
-          已內建：GenYoGothicTW（本地 .ttc）/ Noto Sans TC / Noto Serif TC / Roboto / Montserrat
-        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
