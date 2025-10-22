@@ -395,8 +395,8 @@ export default function BPage() {
 
   /* ---------------- Render ---------------- */
   return (
-    // ✅ 這裡改成 flex 直向佈局，讓 footer 自然貼底
-    <div className="min-h-screen flex flex-col bg-white font-[GenYoGothicTW]">
+    // ✅ 這裡加上 data-b-side，讓白底規則只在 B 端生效
+    <div data-b-side className="min-h-screen flex flex-col bg-white font-[GenYoGothicTW]">
       {/* ✅ 主要內容包在 flex-1 的 <main> 中 */}
       <main className="flex-1">
         <div className="max-w-[1180px] mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
@@ -643,7 +643,7 @@ export default function BPage() {
                                   picked?.id === t.id
                                     ? "ring-2 ring-slate-900"
                                     : ""
-                                }`}
+                                } icon-tile`}  // 👈 保證白底黑字
                                 title={baseName(t.name)}
                               >
                                 <img
@@ -671,28 +671,28 @@ export default function BPage() {
                 輸入資訊
               </span>
 
-              <div className="mt-4 space-y-3">
-                {FIELD_KEYS.map(({ key, match, label }) => (
-                  <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <label className="w-full sm:w-32 text-sm text-slate-700">{label}</label>
-                    <input
-                      className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
-                      placeholder="請輸入…"
-                      value={
-                        picked
-                          ? (() => {
-                              const hit = picked.text_layers.find((l) =>
-                                match.test(l.label)
-                              );
-                              return hit ? values[hit.id] ?? "" : "";
-                            })()
-                          : ""
-                      }
-                      onChange={(e) => setFieldForLabel(match, e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
+            <div className="mt-4 space-y-3">
+              {FIELD_KEYS.map(({ key, match, label }) => (
+                <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <label className="w-full sm:w-32 text-sm text-slate-700">{label}</label>
+                  <input
+                    className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
+                    placeholder="請輸入…"
+                    value={
+                      picked
+                        ? (() => {
+                            const hit = picked.text_layers.find((l) =>
+                              match.test(l.label)
+                            );
+                            return hit ? values[hit.id] ?? "" : "";
+                          })()
+                        : ""
+                    }
+                    onChange={(e) => setFieldForLabel(match, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
             </div>
 
             {/* 下載：PNG / PDF */}
