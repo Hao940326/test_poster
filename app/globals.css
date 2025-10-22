@@ -1,14 +1,9 @@
 @import "tailwindcss";
 
-/* ---------------- 🎨 基本主題變數 ---------------- */
+/* ---------------- 🎨 色彩主題變數 ---------------- */
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --surface: #ffffff;
-  --panel: #f4f4f4;
-  --border: #e5e5e5;
-  --link: #2563eb;
-  --ring: #3b82f6;
 }
 
 @theme inline {
@@ -18,112 +13,87 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* ---------------- 🌙 暗色模式（高對比） ---------------- */
-/* ====== 🔧 Dark mode 對比修正補丁（直接貼在檔案最後） ====== */
 @media (prefers-color-scheme: dark) {
-  /* 1) 取消任何意外的整體透明度（常見於 panel/sidebar 被套 opacity-50） */
-  .card, .panel, .sidebar, .controls, .toolbar, .preview, .list, .form {
-    opacity: 1 !important;
-    filter: none !important;
-    mix-blend-mode: normal !important;
-  }
-  /* 同時把任何 utility 的透明度強制回 1（避免被 class 覆寫） */
-  [class*="opacity-"] { opacity: 1 !important; }
-
-  /* 2) 統一暗色底與邊框（避免半透明淺灰造成整片霧） */
-  .card, .panel, .sidebar, .controls, .toolbar {
-    background-color: #1a1a1a !important;
-    border-color: #333 !important;
-  }
-
-  /* 3) 面板內所有一般文字用亮色；小字別太淡 */
-  .card :is(h1,h2,h3,h4,h5,h6,p,span,div,label,small),
-  .panel :is(h1,h2,h3,h4,h5,h6,p,span,div,label,small),
-  .sidebar :is(h1,h2,h3,h4,h5,h6,p,span,div,label,small) {
-    color: #ffffff !important;
-  }
-  .text-gray-400, .text-neutral-400, .text-slate-400, .text-white\/40, .text-foreground\/40 {
-    color: rgb(255 255 255 / 0.92) !important;
-  }
-
-  /* 4) 表單對比（輸入框、文字區、選單） */
-  input, textarea, select {
-    background-color: #111 !important;
-    color: #fff !important;
-    border: 1px solid #333 !important;
-    border-radius: 0.5rem;
-  }
-  ::placeholder { color: #cfcfcf !important; opacity: 1 !important; }
-  input:focus, textarea:focus, select:focus {
-    outline: 2px solid #7cb8ff !important;
-    outline-offset: 2px;
-  }
-
-  /* 5) 沒指定顏色的按鈕→中性底；有 bg-* 的按鈕→保留 Tailwind 原色 */
-  .btn, button { border: 1px solid #333; border-radius: 0.5rem; }
-  .btn:not([class*="bg-"]), button:not([class*="bg-"]) {
-    background-color: #222 !important; color: #fff !important;
-  }
-  .btn:not([class*="bg-"]):hover, button:not([class*="bg-"]):hover { background-color: #2d2d2d !important; }
-  button[class*="bg-"], .btn[class*="bg-"] { background-color: revert !important; color: revert !important; }
-
-  /* 6) 畫布預覽區若有半透明玻璃感，改為實底避免泛白 */
-  .canvas-area, .editor-canvas, .preview-area {
-    background-color: #1a1a1a !important;
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
   }
 }
 
-
-/* ---------------- 🈶 GenYoGothicTW (Supabase Storage) ---------------- */
+/* ---------------- 🈶 GenYoGothicTW（如需） ---------------- */
+/* 你若已在別處宣告字體，可以把這段拿掉或保留 */
 @font-face {
   font-family: "GenYoGothicTW";
   src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-EL.ttc") format("truetype");
-  font-weight: 200; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-L.ttc") format("truetype");
-  font-weight: 300; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-N.ttc") format("truetype");
-  font-weight: 400; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-M.ttc") format("truetype");
-  font-weight: 500; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-R.ttc") format("truetype");
-  font-weight: 600; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-B.ttc") format("truetype");
-  font-weight: 700; font-style: normal; font-display: swap;
-}
-@font-face {
-  font-family: "GenYoGothicTW";
-  src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-H.ttc") format("truetype");
-  font-weight: 800; font-style: normal; font-display: swap;
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
 }
 
-/* ---------------- 🌈 全域樣式 ---------------- */
-body {
-  background: var(--background);
+/* ---------------- ✅ 強制白底元件（不受深色模式影響） ---------------- */
+/* Icon 方格：給外層加上 .icon-box 就會永遠白底黑字 */
+.icon-box {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #e5e7eb; /* gray-200 */
+  border-radius: 0.75rem;     /* 12px，對齊 rounded-xl */
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+
+/* 選課小方塊按鈕也套白底（若你沒有用 .icon-box 的話，這裡用更廣義選擇器） */
+button.icon-tile {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+/* 輸入欄位：永遠白底黑字 */
+input,
+textarea,
+select {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #d1d5db; /* gray-300 */
+  border-radius: 0.5rem;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af; /* gray-400 */
+  opacity: 1;
+}
+
+/* 深色模式下再保險一次（避免第三方樣式覆蓋） */
+@media (prefers-color-scheme: dark) {
+  .icon-box,
+  button.icon-tile,
+  input,
+  textarea,
+  select {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border-color: #d1d5db !important;
+  }
+}
+
+/* ---------------- ✨ 表單聚焦體驗 ---------------- */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0,0,0,.08);
+  border-color: #111827; /* gray-900 */
+}
+
+/* ---------------- 🖼️ html2canvas 畫布內字體保險（可留） ---------------- */
+[data-stage] {
+  font-family: "GenYoGothicTW","Noto Sans TC",sans-serif;
+}
+
+/* ---------------- 🧼 針對全頁背景（維持主題變數） ---------------- */
+html, body {
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: "GenYoGothicTW", "Noto Sans TC", Arial, Helvetica, sans-serif;
-}
-
-::selection {
-  background: var(--link);
-  color: #fff;
-}
-
-:is(a, button, input, textarea, select):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+  font-family: var(--font-sans), system-ui, -apple-system, "Noto Sans TC", sans-serif;
 }
