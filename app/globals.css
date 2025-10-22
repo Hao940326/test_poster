@@ -1,19 +1,16 @@
 @import "tailwindcss";
 
-/* ---------------- 🎨 亮色主題（預設） ---------------- */
+/* ---------------- 🎨 基本主題變數 ---------------- */
 :root {
   --background: #ffffff;
   --foreground: #171717;
-
-  --surface: #ffffff;  /* 卡片/面板底 */
-  --muted:   #f6f6f6;  /* 次要底/hover */
-  --panel:   #f0f0f0;  /* 輸入框/按鈕底 */
-  --border:  #e6e6e6;  /* 邊框 */
-  --link:    #2563eb;  /* 連結/主色 */
-  --ring:    #3b82f6;  /* 焦點外框 */
+  --surface: #ffffff;
+  --panel: #f4f4f4;
+  --border: #e5e5e5;
+  --link: #2563eb;
+  --ring: #3b82f6;
 }
 
-/* Tailwind v4 @theme inline 變數映射 */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -21,35 +18,63 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* ---------------- 🌙 暗色主題（高對比可讀） ---------------- */
+/* ---------------- 🌙 暗色模式（高對比） ---------------- */
+/* ====== 🔧 Dark mode 對比修正補丁（直接貼在檔案最後） ====== */
 @media (prefers-color-scheme: dark) {
-  input, textarea, select {
-    background-color: #111 !important; /* 深灰底 */
-    color: #f8f8f8 !important;         /* 亮灰字，比純白柔和 */
-    border: 1px solid #333 !important;
-  }
-
-  /* placeholder 文字也調亮一點 */
-  ::placeholder {
-    color: #cfcfcf !important;
+  /* 1) 取消任何意外的整體透明度（常見於 panel/sidebar 被套 opacity-50） */
+  .card, .panel, .sidebar, .controls, .toolbar, .preview, .list, .form {
     opacity: 1 !important;
+    filter: none !important;
+    mix-blend-mode: normal !important;
+  }
+  /* 同時把任何 utility 的透明度強制回 1（避免被 class 覆寫） */
+  [class*="opacity-"] { opacity: 1 !important; }
+
+  /* 2) 統一暗色底與邊框（避免半透明淺灰造成整片霧） */
+  .card, .panel, .sidebar, .controls, .toolbar {
+    background-color: #1a1a1a !important;
+    border-color: #333 !important;
   }
 
-  /* 針對被選中的輸入框，給一點藍色外框 */
+  /* 3) 面板內所有一般文字用亮色；小字別太淡 */
+  .card :is(h1,h2,h3,h4,h5,h6,p,span,div,label,small),
+  .panel :is(h1,h2,h3,h4,h5,h6,p,span,div,label,small),
+  .sidebar :is(h1,h2,h3,h4,h5,h6,p,span,div,label,small) {
+    color: #ffffff !important;
+  }
+  .text-gray-400, .text-neutral-400, .text-slate-400, .text-white\/40, .text-foreground\/40 {
+    color: rgb(255 255 255 / 0.92) !important;
+  }
+
+  /* 4) 表單對比（輸入框、文字區、選單） */
+  input, textarea, select {
+    background-color: #111 !important;
+    color: #fff !important;
+    border: 1px solid #333 !important;
+    border-radius: 0.5rem;
+  }
+  ::placeholder { color: #cfcfcf !important; opacity: 1 !important; }
   input:focus, textarea:focus, select:focus {
-    outline: 2px solid #60a5fa !important;
+    outline: 2px solid #7cb8ff !important;
     outline-offset: 2px;
   }
 
-  /* 如果按鈕或其他可互動項用了同樣底色，也統一調亮 */
-  button {
+  /* 5) 沒指定顏色的按鈕→中性底；有 bg-* 的按鈕→保留 Tailwind 原色 */
+  .btn, button { border: 1px solid #333; border-radius: 0.5rem; }
+  .btn:not([class*="bg-"]), button:not([class*="bg-"]) {
+    background-color: #222 !important; color: #fff !important;
+  }
+  .btn:not([class*="bg-"]):hover, button:not([class*="bg-"]):hover { background-color: #2d2d2d !important; }
+  button[class*="bg-"], .btn[class*="bg-"] { background-color: revert !important; color: revert !important; }
+
+  /* 6) 畫布預覽區若有半透明玻璃感，改為實底避免泛白 */
+  .canvas-area, .editor-canvas, .preview-area {
     background-color: #1a1a1a !important;
-    color: #fff !important;
   }
 }
 
 
-/* ---------------- 🈶 GenYoGothicTW (from Supabase Storage) ---------------- */
+/* ---------------- 🈶 GenYoGothicTW (Supabase Storage) ---------------- */
 @font-face {
   font-family: "GenYoGothicTW";
   src: url("https://bkxmhcjuyyutnectzgqs.supabase.co/storage/v1/object/public/poster-assets/fonts/genyo/GenYoGothic-EL.ttc") format("truetype");
@@ -86,59 +111,19 @@
   font-weight: 800; font-style: normal; font-display: swap;
 }
 
-/* ---------------- 🌈 全域基底 ---------------- */
-* { box-sizing: border-box; }
-html, body { height: 100%; }
+/* ---------------- 🌈 全域樣式 ---------------- */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: "GenYoGothicTW", "Noto Sans TC", Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-::selection { background: var(--link); color: #fff; }
+::selection {
+  background: var(--link);
+  color: #fff;
+}
+
 :is(a, button, input, textarea, select):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-}
-
-/* 常見容器 */
-.card, .panel, .editor {
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-}
-
-/* 控件 */
-button, .btn {
-  background-color: var(--panel);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  cursor: pointer;
-}
-button:hover, .btn:hover { background-color: color-mix(in oklab, var(--panel), #000 8%); }
-
-input, textarea, select {
-  background-color: var(--panel);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-}
-
-/* 連結 */
-a { color: var(--link); }
-
-/* 區塊/列表容器 */
-.scroll-area, .template-list {
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-}
-
-/* 頂欄 */
-header, nav {
-  background-color: color-mix(in oklab, var(--background), #000 5%);
-  color: var(--foreground);
 }
