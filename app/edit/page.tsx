@@ -395,336 +395,341 @@ export default function BPage() {
 
   /* ---------------- Render ---------------- */
   return (
-    <div className="min-h-screen bg-white font-[GenYoGothicTW]">
-      <div className="max-w-[1180px] mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
-        {/* 左：預覽區 */}
-        <div className="lg:col-span-5">
-          <div className="mb-3 inline-flex items-center gap-2">
-            <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
-              海報預覽
-            </span>
-          </div>
+    // ✅ 這裡改成 flex 直向佈局，讓 footer 自然貼底
+    <div className="min-h-screen flex flex-col bg-white font-[GenYoGothicTW]">
+      {/* ✅ 主要內容包在 flex-1 的 <main> 中 */}
+      <main className="flex-1">
+        <div className="max-w-[1180px] mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
+          {/* 左：預覽區 */}
+          <div className="lg:col-span-5">
+            <div className="mb-3 inline-flex items-center gap-2">
+              <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
+                海報預覽
+              </span>
+            </div>
 
-          {/* 外層：負責量測寬度 */}
-          <div ref={previewWrapOuterRef} className="w-full">
-            {/* 內層：實際顯示框 */}
-            <div
-              className="relative mx-auto shadow rounded border border-slate-200 bg-white"
-              style={{ width: "100%", height: Math.round(h * scale) }}
-              ref={stageWrapRef}
-            >
+            {/* 外層：負責量測寬度 */}
+            <div ref={previewWrapOuterRef} className="w-full">
+              {/* 內層：實際顯示框 */}
               <div
-                data-stage
-                className="absolute top-0 left-0"
-                style={{
-                  width: w,
-                  height: h,
-                  transform: `scale(${scale})`,
-                  transformOrigin: "top left",
-                  backgroundImage: picked?.bg_path
-                    ? `url(${toPublicUrl(encodeURI(picked.bg_path))})`
-                    : "none",
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  // ✅ 強制字體（畫布內）
-                  fontFamily: `"GenYoGothicTW","Noto Sans TC",sans-serif`,
-                }}
+                className="relative mx-auto shadow rounded border border-slate-200 bg-white"
+                style={{ width: "100%", height: Math.round(h * scale) }}
+                ref={stageWrapRef}
               >
-                {/* 文字層：選了模板才顯示 */}
-                {picked &&
-                  picked.text_layers.map((L) => (
-                    <div
-                      key={L.id}
-                      className="absolute select-none px-1"
-                      style={{
-                        left: L.x,
-                        top: L.y,
-                        width: Math.max(1, L.width),
-                        color: L.color,
-                        fontSize: L.fontSize,
-                        fontWeight: L.weight,
-                        fontStyle: L.italic ? "italic" : "normal",
-                        textAlign: L.align as any,
-                        textTransform: L.uppercase ? "uppercase" : "none",
-                        textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
-                        lineHeight: 1.1,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                        zIndex: 10,
-                      }}
-                    >
-                      {values[L.id] !== undefined ? values[L.id] : L.text}
-                    </div>
-                  ))}
-
-                {/* Logo：預設不可拖曳/不可點；客戶 Logo 可拖曳 */}
-                {logo.url && (
-                  <img
-                    src={logo.url}
-                    alt="Logo"
-                    draggable={false}
-                    onDragStart={(e) => e.preventDefault()}
-                    style={{
-                      position: "absolute",
-                      left: logoPos.x,
-                      top: logoPos.y,
-                      width: logoPos.size,
-                      height: "auto",
-                      zIndex: 50,
-                      cursor: logo.isDefault ? "default" : "grab",
-                      pointerEvents: logo.isDefault ? "none" : "auto",
-                      userSelect: "none",
-                    }}
-                    onMouseDown={(e) => {
-                      if (logo.isDefault) return;
-                      e.preventDefault();
-                      const p = getStagePoint(e.clientX, e.clientY);
-                      startDragLogo(p.x, p.y);
-                    }}
-                    onTouchStart={(e) => {
-                      if (logo.isDefault) return;
-                      const t = e.touches[0];
-                      if (!t) return;
-                      const p = getStagePoint(t.clientX, t.clientY);
-                      startDragLogo(p.x, p.y);
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 左下：同系列模板（未選模板不顯示） */}
-          {picked && siblings.length > 0 && (
-            <div className="mt-6">
-              <div className="text-[13px] mb-2 font-semibold text-slate-700">
-                選擇模板
-              </div>
-              <div className="flex gap-3">
-                {siblings.map((tpl) => (
-                  <button
-                    key={tpl.id}
-                    onClick={() => setPicked(tpl)}
-                    className={`w-14 h-16 rounded-xl shadow border overflow-hidden ${
-                      picked?.id === tpl.id ? "ring-2 ring-black" : ""
-                    }`}
-                    title={tpl.name}
-                  >
-                    <img
-                      src={getThumbFromBg(tpl)}
-                      onError={(e) => (e.currentTarget.src = placeholder)}
-                      className="w-full h-full object-cover"
-                      alt={tpl.name}
-                      draggable={false}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 上傳 / 控制 Logo（預設時禁用控制） */}
-          <div className="mt-6">
-            <div className="text-[13px] mb-2 font-semibold text-slate-700">
-              上傳LOGO
-            </div>
-            <label className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 grid place-items-center cursor-pointer hover:border-slate-400">
-              <span className="text-2xl">＋</span>
-              <input
-                type="file"
-                className="hidden"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    setLogo({ url: reader.result as string, isDefault: false });
-                    const W = picked?.width ?? 1080;
-                    const H = picked?.height ?? 1528;
-                    const S = 300;
-                    setLogoPos({ x: (W - S) / 2, y: (H - S) / 2, size: S });
-                  };
-                  reader.readAsDataURL(file);
-                }}
-              />
-            </label>
-
-            {logo.url && (
-              <div className="mt-3 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-sm">大小：</label>
-                  <input
-                    type="range"
-                    min="40"
-                    max="320"
-                    value={logoPos.size}
-                    disabled={logo.isDefault}
-                    onChange={(e) =>
-                      setLogoPos((o) => ({ ...o, size: +e.target.value }))
-                    }
-                    className="w-full sm:w-64"
-                  />
-                  <span className="text-xs text-slate-500">
-                    {logoPos.size}px
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm">位置：</span>
-                  <div className="flex gap-2">
-                    {[
-                      { k: "up", fn: () => setLogoPos((o) => ({ ...o, y: o.y - 1 })) },
-                      { k: "down", fn: () => setLogoPos((o) => ({ ...o, y: o.y + 1 })) },
-                      { k: "left", fn: () => setLogoPos((o) => ({ ...o, x: o.x - 1 })) },
-                      { k: "right", fn: () => setLogoPos((o) => ({ ...o, x: o.x + 1 })) },
-                    ].map(({ k, fn }) => (
-                      <button
-                        key={k}
-                        onClick={!logo.isDefault ? fn : undefined}
-                        disabled={logo.isDefault}
-                        className={`px-2 py-1 border rounded ${
-                          logo.isDefault ? "opacity-50 cursor-not-allowed" : ""
-                        }`}
+                <div
+                  data-stage
+                  className="absolute top-0 left-0"
+                  style={{
+                    width: w,
+                    height: h,
+                    transform: `scale(${scale})`,
+                    transformOrigin: "top left",
+                    backgroundImage: picked?.bg_path
+                      ? `url(${toPublicUrl(encodeURI(picked.bg_path))})`
+                      : "none",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    // ✅ 強制字體（畫布內）
+                    fontFamily: `"GenYoGothicTW","Noto Sans TC",sans-serif`,
+                  }}
+                >
+                  {/* 文字層：選了模板才顯示 */}
+                  {picked &&
+                    picked.text_layers.map((L) => (
+                      <div
+                        key={L.id}
+                        className="absolute select-none px-1"
+                        style={{
+                          left: L.x,
+                          top: L.y,
+                          width: Math.max(1, L.width),
+                          color: L.color,
+                          fontSize: L.fontSize,
+                          fontWeight: L.weight,
+                          fontStyle: L.italic ? "italic" : "normal",
+                          textAlign: L.align as any,
+                          textTransform: L.uppercase ? "uppercase" : "none",
+                          textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
+                          lineHeight: 1.1,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          zIndex: 10,
+                        }}
                       >
-                        {k === "up" ? "↑" : k === "down" ? "↓" : k === "left" ? "←" : "→"}
-                      </button>
+                        {values[L.id] !== undefined ? values[L.id] : L.text}
+                      </div>
                     ))}
-                  </div>
-                  <button
-                    onClick={() => setLogo({ url: null, isDefault: false })} // 真的清空
-                    className="ml-0 sm:ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
-                  >
-                    刪除 Logo
-                  </button>
+
+                  {/* Logo：預設不可拖曳/不可點；客戶 Logo 可拖曳 */}
+                  {logo.url && (
+                    <img
+                      src={logo.url}
+                      alt="Logo"
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
+                      style={{
+                        position: "absolute",
+                        left: logoPos.x,
+                        top: logoPos.y,
+                        width: logoPos.size,
+                        height: "auto",
+                        zIndex: 50,
+                        cursor: logo.isDefault ? "default" : "grab",
+                        pointerEvents: logo.isDefault ? "none" : "auto",
+                        userSelect: "none",
+                      }}
+                      onMouseDown={(e) => {
+                        if (logo.isDefault) return;
+                        e.preventDefault();
+                        const p = getStagePoint(e.clientX, e.clientY);
+                        startDragLogo(p.x, p.y);
+                      }}
+                      onTouchStart={(e) => {
+                        if (logo.isDefault) return;
+                        const t = e.touches[0];
+                        if (!t) return;
+                        const p = getStagePoint(t.clientX, t.clientY);
+                        startDragLogo(p.x, p.y);
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 左下：同系列模板（未選模板不顯示） */}
+            {picked && siblings.length > 0 && (
+              <div className="mt-6">
+                <div className="text-[13px] mb-2 font-semibold text-slate-700">
+                  選擇模板
+                </div>
+                <div className="flex gap-3">
+                  {siblings.map((tpl) => (
+                    <button
+                      key={tpl.id}
+                      onClick={() => setPicked(tpl)}
+                      className={`w-14 h-16 rounded-xl shadow border overflow-hidden ${
+                        picked?.id === tpl.id ? "ring-2 ring-black" : ""
+                      }`}
+                      title={tpl.name}
+                    >
+                      <img
+                        src={getThumbFromBg(tpl)}
+                        onError={(e) => (e.currentTarget.src = placeholder)}
+                        className="w-full h-full object-cover"
+                        alt={tpl.name}
+                        draggable={false}
+                      />
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* 右：選課 + 表單 + 下載 */}
-        <div className="lg:col-span-7">
-          <div className="mb-6">
-            <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
-              選擇課程
-            </span>
+            {/* 上傳 / 控制 Logo（預設時禁用控制） */}
+            <div className="mt-6">
+              <div className="text-[13px] mb-2 font-semibold text-slate-700">
+                上傳LOGO
+              </div>
+              <label className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-300 grid place-items-center cursor-pointer hover:border-slate-400">
+                <span className="text-2xl">＋</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      setLogo({ url: reader.result as string, isDefault: false });
+                      const W = picked?.width ?? 1080;
+                      const H = picked?.height ?? 1528;
+                      const S = 300;
+                      setLogoPos({ x: (W - S) / 2, y: (H - S) / 2, size: S });
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
 
-            <div className="mt-4 space-y-6">
-              {loading ? (
-                <div className="text-slate-500">載入中…</div>
-              ) : (
-                grouped.map((grp) => {
-                  const s =
-                    CATEGORY_STYLES[grp.name] ?? CATEGORY_STYLES["其他"];
-                  return (
-                    <div key={grp.name}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className={`inline-block w-2 h-2 rounded-full ${s.dot}`}
-                        />
-                        <span
-                          className={`text-[12px] px-3 py-1 rounded-full ${s.pill}`}
+              {logo.url && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-sm">大小：</label>
+                    <input
+                      type="range"
+                      min="40"
+                      max="320"
+                      value={logoPos.size}
+                      disabled={logo.isDefault}
+                      onChange={(e) =>
+                        setLogoPos((o) => ({ ...o, size: +e.target.value }))
+                      }
+                      className="w-full sm:w-64"
+                    />
+                    <span className="text-xs text-slate-500">
+                      {logoPos.size}px
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm">位置：</span>
+                    <div className="flex gap-2">
+                      {[
+                        { k: "up", fn: () => setLogoPos((o) => ({ ...o, y: o.y - 1 })) },
+                        { k: "down", fn: () => setLogoPos((o) => ({ ...o, y: o.y + 1 })) },
+                        { k: "left", fn: () => setLogoPos((o) => ({ ...o, x: o.x - 1 })) },
+                        { k: "right", fn: () => setLogoPos((o) => ({ ...o, x: o.x + 1 })) },
+                      ].map(({ k, fn }) => (
+                        <button
+                          key={k}
+                          onClick={!logo.isDefault ? fn : undefined}
+                          disabled={logo.isDefault}
+                          className={`px-2 py-1 border rounded ${
+                            logo.isDefault ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
                         >
-                          {grp.name}
-                        </span>
-                        <div className="grow border-dotted border-b border-slate-300 ml-2" />
-                      </div>
-                      <div className="flex flex-wrap gap-2 sm:gap-3">
-                        {grp.items.map((t) => {
-                          const iconUrl = getIconUrl(t);
-                          return (
-                            <button
-                              key={t.id}
-                              onClick={() => selectTemplate(t)}
-                              className={`w-[72px] h-[72px] p-1 rounded-xl border hover:shadow transition flex items-center justify-center ${
-                                picked?.id === t.id
-                                  ? "ring-2 ring-slate-900"
-                                  : ""
-                              }`}
-                              title={baseName(t.name)}
-                            >
-                              <img
-                                src={iconUrl}
-                                onError={(e) =>
-                                  ((e.currentTarget.src = placeholder))
-                                }
-                                className="w-[56px] h-[56px] object-contain"
-                                alt={baseName(t.name)}
-                              />
-                            </button>
-                          );
-                        })}
-                      </div>
+                          {k === "up" ? "↑" : k === "down" ? "↓" : k === "left" ? "←" : "→"}
+                        </button>
+                      ))}
                     </div>
-                  );
-                })
+                    <button
+                      onClick={() => setLogo({ url: null, isDefault: false })} // 真的清空
+                      className="ml-0 sm:ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
+                    >
+                      刪除 Logo
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
 
-          {/* 輸入資訊四欄 */}
-          <div className="mb-6">
-            <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
-              輸入資訊
-            </span>
+          {/* 右：選課 + 表單 + 下載 */}
+          <div className="lg:col-span-7">
+            <div className="mb-6">
+              <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
+                選擇課程
+              </span>
 
-            <div className="mt-4 space-y-3">
-              {FIELD_KEYS.map(({ key, match, label }) => (
-                <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <label className="w-full sm:w-32 text-sm text-slate-700">{label}</label>
-                  <input
-                    className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
-                    placeholder="請輸入…"
-                    value={
-                      picked
-                        ? (() => {
-                            const hit = picked.text_layers.find((l) =>
-                              match.test(l.label)
+              <div className="mt-4 space-y-6">
+                {loading ? (
+                  <div className="text-slate-500">載入中…</div>
+                ) : (
+                  grouped.map((grp) => {
+                    const s =
+                      CATEGORY_STYLES[grp.name] ?? CATEGORY_STYLES["其他"];
+                    return (
+                      <div key={grp.name}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span
+                            className={`inline-block w-2 h-2 rounded-full ${s.dot}`}
+                          />
+                          <span
+                            className={`text-[12px] px-3 py-1 rounded-full ${s.pill}`}
+                          >
+                            {grp.name}
+                          </span>
+                          <div className="grow border-dotted border-b border-slate-300 ml-2" />
+                        </div>
+                        <div className="flex flex-wrap gap-2 sm:gap-3">
+                          {grp.items.map((t) => {
+                            const iconUrl = getIconUrl(t);
+                            return (
+                              <button
+                                key={t.id}
+                                onClick={() => selectTemplate(t)}
+                                className={`w-[72px] h-[72px] p-1 rounded-xl border hover:shadow transition flex items-center justify-center ${
+                                  picked?.id === t.id
+                                    ? "ring-2 ring-slate-900"
+                                    : ""
+                                }`}
+                                title={baseName(t.name)}
+                              >
+                                <img
+                                  src={iconUrl}
+                                  onError={(e) =>
+                                    ((e.currentTarget.src = placeholder))
+                                  }
+                                  className="w-[56px] h-[56px] object-contain"
+                                  alt={baseName(t.name)}
+                                />
+                              </button>
                             );
-                            return hit ? values[hit.id] ?? "" : "";
-                          })()
-                        : ""
-                    }
-                    onChange={(e) => setFieldForLabel(match, e.target.value)}
-                  />
-                </div>
-              ))}
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* 輸入資訊四欄 */}
+            <div className="mb-6">
+              <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-[14px] font-bold shadow">
+                輸入資訊
+              </span>
+
+              <div className="mt-4 space-y-3">
+                {FIELD_KEYS.map(({ key, match, label }) => (
+                  <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <label className="w-full sm:w-32 text-sm text-slate-700">{label}</label>
+                    <input
+                      className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
+                      placeholder="請輸入…"
+                      value={
+                        picked
+                          ? (() => {
+                              const hit = picked.text_layers.find((l) =>
+                                match.test(l.label)
+                              );
+                              return hit ? values[hit.id] ?? "" : "";
+                            })()
+                          : ""
+                      }
+                      onChange={(e) => setFieldForLabel(match, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 下載：PNG / PDF */}
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button
+                onClick={downloadPNG}
+                className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
+              >
+                下載 PNG 圖檔
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 4v10" />
+                  <path d="M8 10l4 4 4-4" />
+                  <path d="M4 20h16" />
+                </svg>
+              </button>
+
+              <button
+                onClick={downloadPDF}
+                className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
+              >
+                下載 PDF 列印
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 4v10" />
+                  <path d="M8 10l4 4 4-4" />
+                  <path d="M4 20h16" />
+                </svg>
+              </button>
             </div>
           </div>
-
-          {/* 下載：PNG / PDF */}
-          <div className="mt-2 flex flex-wrap gap-3">
-            <button
-              onClick={downloadPNG}
-              className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
-            >
-              下載 PNG 圖檔
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 4v10" />
-                <path d="M8 10l4 4 4-4" />
-                <path d="M4 20h16" />
-              </svg>
-            </button>
-
-            <button
-              onClick={downloadPDF}
-              className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
-            >
-              下載 PDF 列印
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 4v10" />
-                <path d="M8 10l4 4 4-4" />
-                <path d="M4 20h16" />
-              </svg>
-            </button>
-          </div>
         </div>
-      </div>
+      </main>
 
+      {/* ✅ footer 會自然貼齊底部 */}
       <footer className="mt-10 bg-[#FFC840] text-[11px] sm:text-[12px] text-white/90 py-3 text-center tracking-wider px-3">
         國王才藝 KING'S TALENT ｜本平台模板由國王才藝原創設計，僅限補教機構之招生宣傳使用，請勿轉售、重製或作商業用途。
       </footer>
