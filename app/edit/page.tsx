@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
 import { listTemplates, toPublicUrl } from "@/lib/dbApi";
 import router from "next/router";
+import { useRouter } from "next/navigation"; // ✅ 新 API
 
 /* ---------------- Types ---------------- */
 type TextLayer = {
@@ -136,18 +137,27 @@ export default function BPage() {
   const [logo, setLogo] = useState<LogoState>({ url: null, isDefault: false });
   const [logoPos, setLogoPos] = useState({ x: 0, y: 0, size: 300 });
 
-// 在你的 BPage 頁面最上面加這段（用 router 導去 /edit/login）
-useEffect(() => {
-  (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      const redirect = encodeURIComponent(location.pathname + location.search || "/edit");
-      // 只負責導去 B 端登入頁，不在這裡啟動 OAuth
-      router.replace(`/edit/login?redirect=${redirect}`);
-    }
-  })();
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+  // 在你的 BPage 頁面最上面加這段（用 router 導去 /edit/login）
+  useEffect(() => {
+    let canceled = false;
+    (async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (canceled) return;
+
+      const session = data?.session;
+      if (!session || error) {
+        const redirect = encodeURIComponent(
+          window.location.pathname + window.location.search || "/edit"
+        );
+        // 只導去 B 端登入頁（不觸發 OAuth）
+        router.replace(`/edit/login?redirect=${redirect}`);
+      }
+    })();
+
+    return () => {
+      canceled = true;
+    };
+  }, [router, supabase]);
   /* -------- 初次載入：不選模板，放公司 Logo（置中&放大） -------- */
   useEffect(() => {
     (async () => {
