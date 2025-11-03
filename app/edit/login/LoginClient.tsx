@@ -21,30 +21,28 @@ export default function LoginClient() {
 
   async function startLogin() {
     try {
-        setBusy(true);
+      setBusy(true);
 
-        // 總是導回「目前網域的 B 端 callback」
-        const origin = window.location.origin; // 例如 https://poster.kingstalent.com.tw 或 http://localhost:3000
-        const callback = `${origin}/edit/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+      // 用目前網域組回呼路徑，避免被帶去 A 端
+      const origin = window.location.origin;
+      const callback = `${origin}/edit/auth/callback?redirect=${encodeURIComponent(redirect)}`;
 
-        const { error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            redirectTo: callback,                 // ✅ 指向 /edit/auth/callback
-            queryParams: { prompt: "select_account" },
+          redirectTo: callback,
+          queryParams: { prompt: "select_account" },
         },
-        });
-
-        if (error) {
+      });
+      if (error) {
         alert("啟動 Google 登入失敗：" + error.message);
         setBusy(false);
-        }
+      }
     } catch (e: any) {
-        alert("發生錯誤：" + e.message);
-        setBusy(false);
+      alert("發生錯誤：" + e.message);
+      setBusy(false);
     }
-    }
-
+  }
 
   return (
     <div className="min-h-screen grid place-items-center bg-white">
