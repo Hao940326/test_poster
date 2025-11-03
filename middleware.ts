@@ -27,16 +27,22 @@ export function middleware(req: NextRequest) {
       path.startsWith("/edit/login") ||
       path.startsWith("/access-denied")
     ) {
-      return NextResponse.next();
+      const res = NextResponse.next();
+      res.headers.set("x-where", "poster-pass");
+      return res;
     }
 
     // ✅ 其他不是 /edit 開頭的頁面，全掛到 /edit 底下
     if (!path.startsWith("/edit")) {
       url.pathname = "/edit" + (path === "/" ? "" : path);
-      return NextResponse.rewrite(url);
+      const res = NextResponse.rewrite(url);
+      res.headers.set("x-where", "poster-rewrite");
+      return res;
     }
 
-    return NextResponse.next();
+    const res = NextResponse.next();
+    res.headers.set("x-where", "poster-normal");
+    return res;
   }
 
   // ============ 🏗️ A 端（studio.kingstalent.com.tw） ============
@@ -46,20 +52,28 @@ export function middleware(req: NextRequest) {
       path.startsWith("/auth/callback") ||
       path.startsWith("/access-denied")
     ) {
-      return NextResponse.next();
+      const res = NextResponse.next();
+      res.headers.set("x-where", "studio-pass");
+      return res;
     }
 
     // ✅ 非 /studio 開頭的頁面掛到 /studio
     if (!path.startsWith("/studio")) {
       url.pathname = "/studio" + (path === "/" ? "" : path);
-      return NextResponse.rewrite(url);
+      const res = NextResponse.rewrite(url);
+      res.headers.set("x-where", "studio-rewrite");
+      return res;
     }
 
-    return NextResponse.next();
+    const res = NextResponse.next();
+    res.headers.set("x-where", "studio-normal");
+    return res;
   }
 
   // ============ 🧑‍💻 其他（localhost、Vercel preview 等） ============
-  return NextResponse.next();
+  const res = NextResponse.next();
+  res.headers.set("x-where", "other-host");
+  return res;
 }
 
 export const config = {
