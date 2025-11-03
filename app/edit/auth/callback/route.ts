@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-function safeRedirectEdit(request: NextRequest) {
-  const url = new URL(request.url);
+function safeRedirectEdit(req: NextRequest) {
+  const url = new URL(req.url);
   const raw = url.searchParams.get("redirect");
   if (!raw) return "/edit";
   try {
@@ -16,40 +16,27 @@ function safeRedirectEdit(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // 為了讓 @supabase/ssr 能寫回 Set-Cookie，需要用一個可回傳的 response 來承接 cookies 操作
-  const response = NextResponse.next();
+  // 建立一個將被回傳的 response：同一個 response 會被寫入 Set-Cookie，再做 302
+  const redirectTo = safeRedirectEdit(request);
+  const response = new NextResponse(null, { status: 302 });
+  response.headers.set("Location", new URL(redirectTo, request.url).toString());
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: "", ...options, expires: new Date(0) });
-        },
+        get: (name: string) => request.cookies.get(name)?.value,
+        set: (name: string, value: string, options: CookieOptions) =>
+          response.cookies.set({ name, value, ...options }),
+        remove: (name: string, options: CookieOptions) =>
+          response.cookies.set({ name, value: "", ...options, expires: new Date(0) }),
       },
     }
   );
 
-  // 1) 用查詢字串中的 code/exchange 掛回 session（關鍵）
+  // 交換 code → session，Set-Cookie 直接寫到上面的 response
   await supabase.auth.exchangeCodeForSession(request.url);
 
-  // 2) 安全導回 /edit（或 /edit/...）
-  const location = safeRedirectEdit(request);
-  const redirect = NextResponse.redirect(new URL(location, request.url));
-
-  // 3) 把剛才寫入的 cookies 帶到真正的 redirect response
-  response.headers.forEach((v, k) => {
-    if (k.toLowerCase() === "set-cookie") {
-      redirect.headers.append(k, v);
-    }
-  });
-
-  return redirect;
+  return response; // 302 + Set-Cookie 同一支回應送出
 }

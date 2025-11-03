@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 
-function safeRedirectStudio(request: NextRequest) {
-  const url = new URL(request.url);
+function safeRedirectStudio(req: NextRequest) {
+  const url = new URL(req.url);
   const raw = url.searchParams.get("redirect");
   if (!raw) return "/studio";
   try {
@@ -16,21 +16,22 @@ function safeRedirectStudio(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const response = NextResponse.next();
+  const location = new URL(safeRedirectStudio(request), request.url).toString();
+  const response = new NextResponse(null, { status: 302 });
+  response.headers.set("Location", location);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
+        getAll() {
+          return request.cookies.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: "", ...options, expires: new Date(0) });
+        setAll(cookies) {
+          cookies.forEach(({ name, value, ...options }) => {
+            response.cookies.set(name, value ?? "", options as any);
+          });
         },
       },
     }
@@ -38,14 +39,5 @@ export async function GET(request: NextRequest) {
 
   await supabase.auth.exchangeCodeForSession(request.url);
 
-  const location = safeRedirectStudio(request);
-  const redirect = NextResponse.redirect(new URL(location, request.url));
-
-  response.headers.forEach((v, k) => {
-    if (k.toLowerCase() === "set-cookie") {
-      redirect.headers.append(k, v);
-    }
-  });
-
-  return redirect;
+  return response;
 }
