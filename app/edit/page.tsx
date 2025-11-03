@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
 import { listTemplates, toPublicUrl } from "@/lib/dbApi";
+import router from "next/router";
 
 /* ---------------- Types ---------------- */
 type TextLayer = {
@@ -135,34 +136,17 @@ export default function BPage() {
   const [logo, setLogo] = useState<LogoState>({ url: null, isDefault: false });
   const [logoPos, setLogoPos] = useState({ x: 0, y: 0, size: 300 });
 
+// 在你的 BPage 頁面最上面加這段（用 router 導去 /edit/login）
 useEffect(() => {
   (async () => {
-    try {
-      // 檢查 session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) return; // 已登入，直接進頁
-
-      // 沒登入 → 啟動 Google OAuth
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       const redirect = encodeURIComponent(location.pathname + location.search || "/edit");
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          // ✅ 自動用目前網域組成 callback
-          redirectTo: `${location.origin}/auth/callback?redirect=${redirect}`,
-          // 建議加 prompt=select_account，使用者切換帳號更直覺
-          queryParams: { prompt: "select_account" },
-        },
-      });
-      if (error) {
-        console.error("OAuth 啟動失敗:", error);
-        alert("啟動 Google 登入失敗：" + error.message);
-      }
-    } catch (e: any) {
-      console.error(e);
+      // 只負責導去 B 端登入頁，不在這裡啟動 OAuth
+      router.replace(`/edit/login?redirect=${redirect}`);
     }
   })();
-  // 只在初次進頁時跑一次
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+// eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
   /* -------- 初次載入：不選模板，放公司 Logo（置中&放大） -------- */
   useEffect(() => {
