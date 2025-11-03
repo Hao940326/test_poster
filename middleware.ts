@@ -5,14 +5,32 @@ import type { NextRequest } from "next/server";
 const STUDIO_HOST = "studio.kingstalent.com.tw";
 const POSTER_HOST = "poster.kingstalent.com.tw";
 
+function withHostCookie(resp: NextResponse, hostname: string) {
+  const isPoster = hostname.includes("poster.");
+  const isStudio = hostname.includes("studio.");
+
+  if (isPoster) {
+    resp.cookies.set("sb-host", "poster", {
+      path: "/",
+      httpOnly: false,
+      sameSite: "lax",
+    });
+  } else if (isStudio) {
+    resp.cookies.set("sb-host", "studio", {
+      path: "/",
+      httpOnly: false,
+      sameSite: "lax",
+    });
+  }
+  return resp;
+}
+
 export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
-  const hostname = url.hostname; // 比 headers.get("host") 穩定
+  const hostname = url.hostname;
   const path = url.pathname;
 
-  /* ----------------------------------------
-   * 1️⃣ 放行必要資源：Next.js 靜態資源 / Auth 回呼 / 登入頁
-   * ---------------------------------------- */
+  // 1) 放行靜態 & Auth 回呼 & 登入頁
   if (
     path.startsWith("/_next") ||
     path.startsWith("/static") ||
@@ -24,45 +42,38 @@ export function middleware(req: NextRequest) {
     path.startsWith("/images") ||
     path.startsWith("/fonts") ||
     path.startsWith("/public") ||
-    path.startsWith("/auth/") ||
+    path.startsWith("/auth/") ||          // 共用回呼
     path.startsWith("/api/auth/") ||
+    path.startsWith("/edit/auth/") ||     // B 端專屬回呼
+    path.startsWith("/studio/auth/") ||   // A 端專屬回呼（若有）
     path.startsWith("/studio/login") ||
     path.startsWith("/edit/login")
   ) {
-    return NextResponse.next();
+    return withHostCookie(NextResponse.next(), hostname);
   }
 
-  /* ----------------------------------------
-   * 2️⃣ Studio 子網域 → 永遠掛在 /studio 下
-   * ---------------------------------------- */
+  // 2) Studio 子網域 → 永遠掛 /studio
   if (hostname === STUDIO_HOST || hostname.startsWith("studio.")) {
     if (!path.startsWith("/studio")) {
       url.pathname = "/studio" + (path === "/" ? "" : path);
-      return NextResponse.rewrite(url);
+      return withHostCookie(NextResponse.rewrite(url), hostname);
     }
-    return NextResponse.next();
+    return withHostCookie(NextResponse.next(), hostname);
   }
 
-  /* ----------------------------------------
-   * 3️⃣ Poster 子網域 → 永遠掛在 /edit 下
-   * ---------------------------------------- */
+  // 3) Poster 子網域 → 永遠掛 /edit
   if (hostname === POSTER_HOST || hostname.startsWith("poster.")) {
     if (!path.startsWith("/edit")) {
       url.pathname = "/edit" + (path === "/" ? "" : path);
-      return NextResponse.rewrite(url);
+      return withHostCookie(NextResponse.rewrite(url), hostname);
     }
-    return NextResponse.next();
+    return withHostCookie(NextResponse.next(), hostname);
   }
 
-  /* ----------------------------------------
-   * 4️⃣ 其他網域（預覽或測試）→ 不處理
-   * ---------------------------------------- */
-  return NextResponse.next();
+  // 4) 其他網域（預覽/測試）
+  return withHostCookie(NextResponse.next(), hostname);
 }
 
-/* ----------------------------------------
- * ✅ Matcher：排除靜態資源與公共檔案，避免被 rewrite
- * ---------------------------------------- */
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|images/|fonts/|public/|icon|apple-touch-icon).*)",
