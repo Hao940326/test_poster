@@ -6,10 +6,7 @@ let browserClient: ReturnType<typeof createClient> | null = null;
 export function getSupabase() {
   if (!browserClient) {
     browserClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-      },
+      auth: { persistSession: true, autoRefreshToken: true },
     });
   }
   return browserClient;

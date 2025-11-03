@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabaseClient";
-import { ORIGIN, BASE } from "@/lib/env"; // ORIGIN=poster, BASE=/edit
+import { ORIGIN, BASE } from "@/lib/env";
 
 function safeRedirect(raw: string | null) {
   if (!raw) return BASE;
@@ -35,7 +35,8 @@ export default function PosterLoginPage() {
       provider: "google",
       options: { redirectTo: cb, queryParams: { prompt: "select_account" } },
     });
-    if (error) { alert(error.message); setBusy(false); }
+    if (error) alert(error.message);
+    setBusy(false);
   }
 
   return (

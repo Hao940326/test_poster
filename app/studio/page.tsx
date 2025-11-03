@@ -1,3 +1,7 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Head from "next/head";
@@ -448,17 +452,18 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         icon_path = await uploadIconDataUrlToStorage(id, tpl.iconUrl);
       }
 
-      const saved = await upsertTemplate({
-        id,
-        name,
-        width: tpl.width,
-        height: tpl.height,
-        text_layers: tpl.textLayers,
-        ...(bg_path ? { bg_path } : {}),
-        ...(icon_path ? { icon_path } : {}),
-        is_published: true,
-        owner: user?.id ?? null,
-      });
+     const saved: TemplateRow = await upsertTemplate({
+      id,
+      name,
+      width: tpl.width,
+      height: tpl.height,
+      text_layers: tpl.textLayers,
+      ...(bg_path ? { bg_path } : {}),
+      ...(icon_path ? { icon_path } : {}),
+      is_published: true,
+      owner: user?.id ?? null,
+    }) as TemplateRow;
+
 
       setTpl(o => ({
         ...o,
@@ -495,7 +500,7 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         icon_path = await uploadIconDataUrlToStorage(id, tpl.iconUrl);
       }
 
-      const saved = await upsertTemplate({
+      const saved: TemplateRow = await upsertTemplate({
         id,
         name,
         width: tpl.width,
@@ -504,7 +509,9 @@ function AdminTemplateEditor({ supabase, user }: { supabase: SupabaseClient; use
         ...(bg_path ? { bg_path } : {}),
         ...(icon_path ? { icon_path } : {}),
         is_published: true,
-      });
+        owner: user?.id ?? null,
+      }) as TemplateRow;
+
 
       setTpl(o => ({
         ...o,
