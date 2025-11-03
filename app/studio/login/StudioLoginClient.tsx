@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabaseClient";
 
-function safeRedirect(redirect: string | null) {
-  if (!redirect) return "/studio";
+function sanitizeStudioRedirect(raw: string | null): string {
+  if (!raw) return "/studio";
   try {
-    const u = new URL(redirect, window.location.origin);
+    const u = new URL(raw, window.location.origin);
     if (u.origin !== window.location.origin) return "/studio";
     if (!u.pathname.startsWith("/studio")) return "/studio";
     return u.pathname + u.search + u.hash;
@@ -22,7 +22,7 @@ export default function StudioLoginClient() {
   const sp = useSearchParams();
   const [busy, setBusy] = useState(false);
 
-  const redirect = safeRedirect(sp.get("redirect"));
+  const redirect = sanitizeStudioRedirect(sp.get("redirect"));
 
   useEffect(() => {
     (async () => {
@@ -34,20 +34,17 @@ export default function StudioLoginClient() {
   async function startLogin() {
     try {
       setBusy(true);
-      const cb = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+      const callback = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: cb,
+          redirectTo: callback,
           queryParams: { prompt: "select_account" },
         },
       });
-      if (error) {
-        alert("啟動 Google 登入失敗：" + error.message);
-        setBusy(false);
-      }
+      if (error) throw error;
     } catch (e: any) {
-      alert("發生錯誤：" + e.message);
+      alert("啟動登入失敗：" + e.message);
       setBusy(false);
     }
   }
