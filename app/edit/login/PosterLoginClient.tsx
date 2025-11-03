@@ -7,6 +7,7 @@ import { getSupabase } from "@/lib/supabaseClient";
 function safeRedirect(redirect: string | null) {
   if (!redirect) return "/edit";
   try {
+    if (typeof window === "undefined") return "/edit";
     const u = new URL(redirect, window.location.origin);
     if (u.origin !== window.location.origin) return "/edit";
     if (!u.pathname.startsWith("/edit")) return "/edit";
@@ -34,14 +35,18 @@ export default function PosterLoginPage() {
   async function startLogin() {
     try {
       setBusy(true);
-      const cb = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+
+      // ✅ 改這裡：callback 指向 /edit/auth/callback
+      const cb = `${window.location.origin}/edit/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: cb, // 會回到當前網域 (poster 或 test 預覽網域)
+          redirectTo: cb,
           queryParams: { prompt: "select_account" },
         },
       });
+
       if (error) {
         alert("啟動 Google 登入失敗：" + error.message);
         setBusy(false);
