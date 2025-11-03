@@ -4,13 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabaseClient";
 
-export default function LoginClient() {
+function safeRedirect(redirect: string | null) {
+  if (!redirect) return "/studio";
+  try {
+    const u = new URL(redirect, window.location.origin);
+    if (u.origin !== window.location.origin) return "/studio";
+    if (!u.pathname.startsWith("/studio")) return "/studio";
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return "/studio";
+  }
+}
+
+export default function StudioLoginPage() {
   const supabase = useMemo(() => getSupabase(), []);
   const router = useRouter();
   const sp = useSearchParams();
   const [busy, setBusy] = useState(false);
 
-  const redirect = sp.get("redirect") || "/edit";
+  const redirect = safeRedirect(sp.get("redirect"));
 
   useEffect(() => {
     (async () => {
@@ -22,15 +34,11 @@ export default function LoginClient() {
   async function startLogin() {
     try {
       setBusy(true);
-
-      // 用目前網域組回呼路徑，避免被帶去 A 端
-      const origin = window.location.origin;
-      const callback = `${origin}/edit/auth/callback?redirect=${encodeURIComponent(redirect)}`;
-
+      const cb = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: callback,
+          redirectTo: cb,
           queryParams: { prompt: "select_account" },
         },
       });
@@ -47,10 +55,7 @@ export default function LoginClient() {
   return (
     <div className="min-h-screen grid place-items-center bg-white">
       <div className="w-full max-w-sm rounded-2xl border p-6 shadow-sm">
-        <h1 className="text-xl font-bold mb-4 text-center">登入 Poster</h1>
-        <p className="text-sm text-slate-600 mb-6 text-center">
-          使用 Google 帳號登入以建立與下載海報
-        </p>
+        <h1 className="text-xl font-bold mb-4 text-center">登入 Studio（A端）</h1>
         <button
           onClick={startLogin}
           disabled={busy}
