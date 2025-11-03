@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
 import { listTemplates, toPublicUrl } from "@/lib/dbApi";
-import { useRouter } from "next/navigation"; // ✅ 專用 app router
+import { useRouter } from "next/navigation";
 
 /* ---------------- Types ---------------- */
 type TextLayer = {
@@ -38,9 +38,8 @@ const placeholder =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
 const DEFAULT_LOGO =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAEYCAMAAADCuiwhAAAA8FBMVEX///9FGwr93ABBEwBCFQDt6edDFwBEGQY6AADY0M44AAD5+Pc+CgD8+/ptTkE8AABEDgD/+d3/5hH/4gD+8aSQenTm4N3//Oz//vn//vKzp6P+63r+75D+6Wry7+3/6jb/7lL+9Lj/+dExAABgPzXPxMAvAABXLx+7rag9CAB+Y1meioOtnZfe19TBtrFyVUopAACIb2Whj4ggAABWNCn+867++NL+8aCCaV9OJBJ5XVJZNyyTf3jKvrpKGwBlRTn95lL940D96GL+7If+7Hf/7D1VKxlcNCRZOTBjSkRQLSJsVE5OGgBKJRqTe3FwTkCBhotnAAATBElEQVR4nO1deX/SStsOZCMbia3EihqtkJI9JVYlQILLOWDbR/z+3+bNhC5AZibUZCjn/XH9cY7aFC7uuefeZ6Coajj7erb7w68qvlldeNE83/3Zb7s/SxTnzZOPOz764nuzueuz2RI+YQWfipfN5rcXOz35+t1ps/l+t2czzm92ffIvkJE+fb...";
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAEYCAMAAADCuiwhAAAA8FBMVEX///9FGwr93ABBEwBCFQDt6edDFwBEGQY6AADY0M44AAD5+Pc+CgD8+/ptTkE8AABEDgD/+d3/5hH/4gD+8aSQenTm4N3//Oz//vn//vKzp6P+63r+75D+6Wry7+3/6jb/7lL+9Lj/+dExAABgPzXPxMAvAABXLx+7rag9CAB+Y1meioOtnZfe19TBtrFyVUopAACIb2Whj4ggAABWNCn+867++NL+8aCCaV9OJBJ5XVJZNyyTf3jKvrpKGwBlRTn95lL940D96GL+7If+7Hf/7D1VKxlcNCRZOTBjSkRQLSJsVE5OGgBKJRqTe3FwTkCBhotnAAATBElEQVR4nO1deX/SStsOZCMbia3EihqtkJI9JVYlQILLOWDbR/z+3+bNhC5AZibUZCjn/XH9cY7aFC7uuefeZ6Coajj7erb7w68qvlldeNE83/3Zb7s/SxTnzZOPOz764nuzueuz2RI+YQWfipfN5rcXOz35+t1ps/l+t2czzm92ffIvkJE+fb..."; // 略
 
-/** Logo 狀態：是否為預設 */
 type LogoState = { url: string | null; isDefault: boolean };
 
 function safeKey(name: string) {
@@ -119,7 +118,10 @@ export default function BPage() {
   const supabase = useMemo<SupabaseClient>(() => getSupabase(), []);
   const router = useRouter();
 
-  // ✅ 登入守門機制
+  // 🧩 登入守門
+  const [checking, setChecking] = useState(true);
+  const [authed, setAuthed] = useState(false);
+
   useEffect(() => {
     let canceled = false;
     (async () => {
@@ -132,7 +134,11 @@ export default function BPage() {
           window.location.pathname + window.location.search || "/edit"
         );
         router.replace(`/edit/login?redirect=${redirect}`);
+        return;
       }
+
+      setAuthed(true);
+      setChecking(false);
     })();
 
     return () => {
@@ -140,19 +146,27 @@ export default function BPage() {
     };
   }, [router, supabase]);
 
-  // ---------------- 原本主程式開始 ----------------
+  if (checking)
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500">
+        檢查登入中…
+      </div>
+    );
+
+  if (!authed) return null;
+
+  /* ---------------- 主內容 ---------------- */
   const [templates, setTemplates] = useState<TemplateRowLite[]>([]);
   const [picked, setPicked] = useState<TemplateRowLite | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [logo, setLogo] = useState<LogoState>({ url: null, isDefault: false });
+  const [logoPos, setLogoPos] = useState({ x: 0, y: 0, size: 300 });
 
   const previewWrapOuterRef = useRef<HTMLDivElement>(null);
   const stageWrapRef = useRef<HTMLDivElement>(null);
   const [wrapWidth, setWrapWidth] = useState<number>(0);
-  const [logo, setLogo] = useState<LogoState>({ url: null, isDefault: false });
-  const [logoPos, setLogoPos] = useState({ x: 0, y: 0, size: 300 });
 
-  // 初次載入模板
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -167,242 +181,29 @@ export default function BPage() {
         text_layers: r.text_layers,
       }));
       setTemplates(mapped);
+      const W = 1080, H = 1528, S = 300;
       setLogo({ url: DEFAULT_LOGO, isDefault: true });
+      setLogoPos({ x: (W - S) / 2, y: (H - S) / 2, size: S });
       setLoading(false);
     })();
   }, []);
 
-  // 量測容器寬度（ResizeObserver）
   useEffect(() => {
     const el = previewWrapOuterRef.current;
     if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const e of entries) setWrapWidth(Math.floor(e.contentRect.width));
-    });
+    const ro = new ResizeObserver((entries) =>
+      entries.forEach((e) => setWrapWidth(Math.floor(e.contentRect.width)))
+    );
     ro.observe(el);
-    setWrapWidth(el.clientWidth || 0);
     return () => ro.disconnect();
   }, []);
 
-  /* ------- 工具 ------- */
-  function getIconUrl(t: TemplateRowLite) {
-    const path = t.icon_path!;
-    const { data } = supabase.storage
-      .from("poster-assets")
-      .getPublicUrl(encodeURI(path));
-    return data?.publicUrl ?? placeholder;
-  }
-
-  /** 左下縮圖只抓背景 */
-  function getThumbFromBg(t: TemplateRowLite) {
-    const p = t.bg_path;
-    if (!p) return placeholder;
-    return /^https?:|^data:image\//.test(p) ? p : toPublicUrl(encodeURI(p));
-  }
-
-  function selectTemplate(t: TemplateRowLite) {
-    setPicked(t);
-
-    const init: Record<string, string> = {};
-    for (const L of t.text_layers) init[L.id] = L.text;
-    setValues(init);
-
-    // ✅ 選模板時只移除「預設 Logo」，若已是客戶 Logo 就保留
-    setLogo((prev) => (prev.isDefault ? { url: null, isDefault: false } : prev));
-  }
-
-  function setFieldForLabel(match: RegExp, text: string) {
-    if (!picked) return;
-    const hit = picked.text_layers.find((l) => match.test(l.label));
-    if (!hit) return;
-    setValues((o) => ({ ...o, [hit.id]: text }));
-  }
-
-  function getFieldValue(fieldKey: typeof FIELD_KEYS[number]["key"]) {
-    if (!picked) return "";
-    const conf = FIELD_KEYS.find((f) => f.key === fieldKey)!;
-    const hit = picked.text_layers.find((l) => conf.match.test(l.label));
-    return hit ? values[hit.id] ?? "" : "";
-  }
-
-  function toSafeFilename(s: string, fallback = "未命名") {
-    s = (s ?? "").replace(/\u3000/g, " ").trim();
-    s = s.replace(/[\\\/:\*\?"<>\|\u0000-\u001F]/g, "");
-    s = s.replace(
-      /[\u{1F000}-\u{1FAFF}\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}]/gu,
-      ""
-    );
-    s = s.replace(/\s+/g, " ");
-    if (!s) s = fallback;
-    if (s.length > 80) s = s.slice(0, 80).trim();
-    return s;
-  }
-
-  /* ---------------- 尺寸 / 拖曳 ---------------- */
+  /* ---------------- 渲染 ---------------- */
   const w = picked?.width ?? 1080;
   const h = picked?.height ?? 1528;
-  const scale = Math.min((wrapWidth > 0 ? wrapWidth : 480) / w, 1);
+  const scale = Math.min((wrapWidth || 480) / w, 1);
 
-  const getStagePoint = (clientX: number, clientY: number) => {
-    const rect = stageWrapRef.current!.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) / scale,
-      y: (clientY - rect.top) / scale,
-    };
-  };
-
-  const startDragLogo = (startX: number, startY: number) => {
-    const offX = startX - logoPos.x;
-    const offY = startY - logoPos.y;
-
-    const onMove = (cx: number, cy: number) => {
-      const { x, y } = getStagePoint(cx, cy);
-      const maxX = Math.max(0, w - logoPos.size);
-      const maxY = Math.max(0, h - logoPos.size);
-      setLogoPos((o) => ({
-        ...o,
-        x: Math.max(0, Math.min(x - offX, maxX)),
-        y: Math.max(0, Math.min(y - offY, maxY)),
-      }));
-    };
-
-    const onMouseMove = (e: MouseEvent) => onMove(e.clientX, e.clientY);
-    const onMouseUp = () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-
-    const onTouchMove = (e: TouchEvent) => {
-      const t = e.touches[0];
-      if (!t) return;
-      onMove(t.clientX, t.clientY);
-    };
-    const onTouchEnd = () => {
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("touchcancel", onTouchEnd);
-    };
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", onTouchEnd, { passive: false });
-    window.addEventListener("touchcancel", onTouchEnd, { passive: false });
-  };
-
-  /* --------- 同系列模板切換 --------- */
-  const siblings = React.useMemo(() => {
-    if (!picked) return [] as TemplateRowLite[];
-    const bn = baseName(picked.name);
-    const same = templates.filter((t) => baseName(t.name) === bn);
-    return same.sort((a, b) => {
-      const na = tailNumber(a.name),
-        nb = tailNumber(b.name);
-      if (na === nb) return a.name.localeCompare(b.name, "zh-Hant");
-      return na - nb;
-    });
-  }, [picked, templates]);
-
-  /* --------- 右側選課（只顯示代表） --------- */
-  const grouped = React.useMemo(() => {
-    const reps = representativesByBase(templates);
-    const map = new Map<string, TemplateRowLite[]>();
-    for (const t of reps) {
-      const cat = guessCategory(t.name);
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(t);
-    }
-    for (const v of map.values())
-      v.sort((a, b) => a.name.localeCompare(b.name, "zh-Hant"));
-    const order = ["創意手作", "益智挑戰", "STEAM啟航", "律動節奏", "其他"];
-    return order
-      .filter((k) => map.has(k))
-      .map((k) => ({ name: k, items: map.get(k)! }));
-  }, [templates]);
-
-  /* ---------------- 匯出：PNG / PDF ---------------- */
-  async function getStageCanvas(scaleFactor = 3) {
-    // ✅ 先等字體載入，避免 html2canvas fallback 到預設字體
-    if ((document as any).fonts?.ready) {
-      await (document as any).fonts.ready;
-    }
-
-    const stage =
-      stageWrapRef.current?.querySelector<HTMLDivElement>("[data-stage]");
-    if (!stage) return null;
-
-    const html2canvas = (await import("html2canvas")).default;
-    const canvas = await html2canvas(stage, {
-      scale: scaleFactor,
-      useCORS: true,
-      backgroundColor: null,
-      width: w,
-      height: h,
-      windowWidth: w,
-      windowHeight: h,
-      scrollX: 0,
-      scrollY: 0,
-      onclone: (doc) => {
-        const cloned = doc.querySelector("[data-stage]") as HTMLElement | null;
-        if (cloned) {
-          cloned.style.transform = "none";
-          cloned.style.transformOrigin = "top left";
-          cloned.style.width = `${w}px`;
-          cloned.style.height = `${h}px`;
-          // ✅ 再保險一次：強制字體
-          cloned.style.fontFamily = `"GenYoGothicTW","Noto Sans TC",sans-serif`;
-        }
-      },
-    });
-    return canvas;
-  }
-
-  async function downloadPNG() {
-    if (!stageWrapRef.current) return;
-    const canvas = await getStageCanvas(3);
-    if (!canvas) return;
-
-    const schoolInput = getFieldValue("school");
-    const courseBase = baseName(picked?.name ?? "未選模板");
-    const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(
-      courseBase
-    )}.png`;
-
-    const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png", 1.0);
-    link.download = fileName;
-    link.click();
-  }
-
-  async function downloadPDF() {
-    if (!stageWrapRef.current) return;
-    const canvas = await getStageCanvas(3);
-    if (!canvas) return;
-
-    const { jsPDF } = await import("jspdf");
-    const imgData = canvas.toDataURL("image/png", 1.0);
-    const pdf = new jsPDF({ orientation: "p", unit: "px", format: "a4" });
-    pdf.internal.scaleFactor = 1;
-
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = Math.min(pageW / w, pageH / h);
-    const imgW = w * ratio;
-    const imgH = h * ratio;
-    const offsetX = (pageW - imgW) / 2;
-    const offsetY = (pageH - imgH) / 2;
-
-    pdf.addImage(imgData, "PNG", offsetX, offsetY, imgW, imgH, undefined, "FAST");
-
-    const schoolInput = getFieldValue("school");
-    const courseBase = baseName(picked?.name ?? "未選模板");
-    const fileName = `${toSafeFilename(schoolInput)}_${toSafeFilename(
-      courseBase
-    )}.pdf`;
-    pdf.save(fileName);
-  }
-
-  /* ---------------- Render ---------------- */
-  return (
+   return (
     // ✅ 這裡加上 data-b-side，讓白底規則只在 B 端生效
     <div data-b-side className="min-h-screen flex flex-col bg-white font-[GenYoGothicTW]">
       {/* ✅ 主要內容包在 flex-1 的 <main> 中 */}
@@ -736,8 +537,6 @@ export default function BPage() {
           </div>
         </div>
       </main>
-
-      {/* ✅ footer 會自然貼齊底部 */}
       <footer className="mt-10 bg-[#FFC840] text-[11px] sm:text-[12px] text-white/90 py-3 text-center tracking-wider px-3">
         國王才藝 KING'S TALENT ｜本平台模板由國王才藝原創設計，僅限補教機構之招生宣傳使用，請勿轉售、重製或作商業用途。
       </footer>
