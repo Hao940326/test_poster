@@ -1,62 +1,65 @@
-// middleware.ts  (專案根目錄)
+// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const STUDIO = "studio.kingstalent.com.tw"; // A 端
-const POSTER = "poster.kingstalent.com.tw"; // B 端
+const STUDIO_HOST = "studio.kingstalent.com.tw";
+const POSTER_HOST = "poster.kingstalent.com.tw";
+
+// 取得乾淨的 hostname（去掉 :3000 / Vercel 轉發）
+function getHostname(req: NextRequest) {
+  const h =
+    req.headers.get("x-forwarded-host") ||
+    req.headers.get("host") ||
+    "";
+  return h.split(":")[0].toLowerCase();
+}
 
 export function middleware(req: NextRequest) {
-  try {
-    const url = req.nextUrl.clone();
-    const host =
-      req.headers.get("x-forwarded-host") ||
-      req.headers.get("host") ||
-      url.hostname;
+  const url = req.nextUrl.clone();
+  const host = getHostname(req);
+  const path = url.pathname;
 
-    const path = url.pathname;
-
-    // ✅ 1) Auth/Next/API/靜態：直接放行，避免改寫 OAuth 回傳
-    //    （雖然 matcher 也會排除，但這裡再早退最保險）
+  // ---- B 端（poster）----
+  if (host === POSTER_HOST || host.startsWith("poster.")) {
+    // 登入/回呼/拒絕頁 一律放行（避免被 rewrite）
     if (
-      path.startsWith("/auth/") ||
-      path === "/auth" ||
-      path.startsWith("/api/") ||
-      path.startsWith("/_next/")
+      path.startsWith("/auth/callback") ||
+      path.startsWith("/edit/login") ||
+      path.startsWith("/access-denied")
     ) {
       return NextResponse.next();
     }
-
-    // ✅ 2) 子網域路由改寫
-    // A 端：studio -> /studio(...)
-    if (host === STUDIO || host.startsWith("studio.")) {
-      if (!path.startsWith("/studio")) {
-        url.pathname = "/studio" + (path === "/" ? "" : path);
-        return NextResponse.rewrite(url); // query 會保留
-      }
-      return NextResponse.next();
+    // 其他路徑都掛到 /edit 底下
+    if (!path.startsWith("/edit")) {
+      url.pathname = "/edit" + (path === "/" ? "" : path);
+      return NextResponse.rewrite(url);
     }
-
-    // B 端：poster -> /edit(...)
-    if (host === POSTER || host.startsWith("poster.")) {
-      if (!path.startsWith("/edit")) {
-        url.pathname = "/edit" + (path === "/" ? "" : path);
-        return NextResponse.rewrite(url);
-      }
-      return NextResponse.next();
-    }
-
-    // 其他網域：不處理
-    return NextResponse.next();
-  } catch (e) {
-    console.error("middleware error:", e);
     return NextResponse.next();
   }
+
+  // ---- A 端（studio）----
+  if (host === STUDIO_HOST || host.startsWith("studio.")) {
+    // 回呼/拒絕頁也放行（若 A 端也有）
+    if (
+      path.startsWith("/auth/callback") ||
+      path.startsWith("/access-denied")
+    ) {
+      return NextResponse.next();
+    }
+    if (!path.startsWith("/studio")) {
+      url.pathname = "/studio" + (path === "/" ? "" : path);
+      return NextResponse.rewrite(url);
+    }
+    return NextResponse.next();
+  }
+
+  // 其他 host（本機 localhost、預覽 domain…）→ 不做 A 端強制導向，避免一律變 studio
+  return NextResponse.next();
 }
 
-// ✅ 3) matcher 也把 auth 排除，避免被攔
 export const config = {
   matcher: [
-    // 排除 auth/api/_next 及常見靜態檔案
-    '/((?!auth/|api/|_next/|static/|public/|favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\.(?:png|jpg|jpeg|gif|svg|ico|css|js|map|txt|webmanifest|woff|woff2|ttf|otf|webp)$).*)',
+    // 依需求調整
+    "/((?!_next|.*\\..*).*)",
   ],
 };

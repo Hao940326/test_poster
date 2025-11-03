@@ -5,9 +5,9 @@ import { getSupabase } from "@/lib/supabaseClient";
 import { guardAllowed } from "@/lib/guardAllowed";
 
 // 只允許站內相對路徑，避免 open-redirect
-function safeRedirect(u: URL) {
-  const r = u.searchParams.get("redirect") || "/"; // 建議用根路徑，交給 middleware 導到 /studio
-  return r.startsWith("/") ? r : "/";
+function safeRedirectPath(raw: string | null | undefined) {
+  const r = (raw || "/edit").trim();
+  return r.startsWith("/") ? r : "/edit";
 }
 
 export default function AuthCallbackPage() {
@@ -23,13 +23,15 @@ export default function AuthCallbackPage() {
     (async () => {
       try {
         const url = new URL(window.location.href);
+
+        // ✅ 先把 redirect 存起來（清 URL 之前）
+        const wantedPath = safeRedirectPath(url.searchParams.get("redirect"));
+
         const hasCode = !!url.searchParams.get("code");
 
-        // 1) 若 URL 有 code，用 PKCE 換票；否則試 hash(#access_token)；再不行就看是否已經有 session
+        // 1) PKCE 或備援 hash；再不行看是否已有 session
         if (hasCode) {
-          const { error } = await supabase.auth.exchangeCodeForSession(url.toString());({
-            currentUrl: url.toString(),
-          });
+          const { error } = await supabase.auth.exchangeCodeForSession(url.toString());
           if (error) throw error;
         } else {
           const h = new URLSearchParams(window.location.hash.slice(1));
@@ -37,39 +39,40 @@ export default function AuthCallbackPage() {
           const rt = h.get("refresh_token");
 
           if (at && rt) {
-            await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+            const { error } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+            if (error) throw error;
           } else {
-            // 沒有 code/hash：如果本來就有 session，當作回跳；否則判為失敗
             const { data } = await supabase.auth.getSession();
             if (!data.session) throw new Error("No code/tokens and no existing session");
           }
         }
 
-        // 2) 名單守門：一定要在導頁前檢查
+        // 2) 名單守門（導頁前檢查）
         const { allowed, email } = await guardAllowed(supabase, "callback");
         if (!allowed) {
           await supabase.auth.signOut();
-          localStorage.setItem(
-            "denied_reason",
-            email ? `不在允許名單：${email}` : "無法取得 email"
-          );
+          try {
+            localStorage.setItem(
+              "denied_reason",
+              email ? `不在允許名單：${email}` : "無法取得 email"
+            );
+          } catch {}
           router.replace("/access-denied");
           return;
         }
 
-        // 3) 清掉 URL 上的 code / hash，避免殘留在 history
+        // 3) 清掉 code/state/hash（不留在 history）
         try {
           const clean = new URL(window.location.href);
           clean.searchParams.delete("code");
           clean.searchParams.delete("state");
-          // 清 hash
           window.history.replaceState({}, "", clean.pathname + clean.search);
         } catch {}
 
-        // 4) 安全導回（根路徑交給 middleware -> /studio）
-        const to = safeRedirect(new URL(window.location.href));
+        // 4) 用絕對網址硬導回「目前網域」的目標頁（避免任何中途重寫到 A 端）
         setMsg("登入成功，導向中…");
-        router.replace(to);
+        const target = new URL(wantedPath, location.origin); // e.g. https://poster.../edit
+        location.replace(target.toString());
       } catch (e: any) {
         console.error("[auth/callback]", e);
         setMsg("登入失敗：" + (e?.message ?? String(e)));
