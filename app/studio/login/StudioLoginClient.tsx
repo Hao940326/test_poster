@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabaseClient";
 
-function sanitizeStudioRedirect(raw: string | null): string {
+function sanitizeRedirect(raw: string | null): string {
   if (!raw) return "/studio";
   try {
     const u = new URL(raw, window.location.origin);
@@ -22,7 +22,7 @@ export default function StudioLoginClient() {
   const sp = useSearchParams();
   const [busy, setBusy] = useState(false);
 
-  const redirect = sanitizeStudioRedirect(sp.get("redirect"));
+  const redirect = sanitizeRedirect(sp.get("redirect"));
 
   useEffect(() => {
     (async () => {
@@ -34,7 +34,9 @@ export default function StudioLoginClient() {
   async function startLogin() {
     try {
       setBusy(true);
-      const callback = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+      const origin = window.location.origin; // 會是 https://studio.kingstalent.com.tw
+      const callback = `${origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -42,9 +44,12 @@ export default function StudioLoginClient() {
           queryParams: { prompt: "select_account" },
         },
       });
-      if (error) throw error;
+      if (error) {
+        alert("啟動 Google 登入失敗：" + error.message);
+        setBusy(false);
+      }
     } catch (e: any) {
-      alert("啟動登入失敗：" + e.message);
+      alert("發生錯誤：" + e.message);
       setBusy(false);
     }
   }
@@ -53,6 +58,9 @@ export default function StudioLoginClient() {
     <div className="min-h-screen grid place-items-center bg-white">
       <div className="w-full max-w-sm rounded-2xl border p-6 shadow-sm">
         <h1 className="text-xl font-bold mb-4 text-center">登入 Studio（A端）</h1>
+        <p className="text-sm text-slate-600 mb-6 text-center">
+          使用 Google 帳號登入以管理模板與素材
+        </p>
         <button
           onClick={startLogin}
           disabled={busy}
