@@ -35,7 +35,7 @@ export default function StudioLoginClient() {
     try {
       setBusy(true);
       const origin = window.location.origin; // 會是 https://studio.kingstalent.com.tw
-      const callback = `${origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+      const callback = `${origin}/studio/auth/callback?redirect=${encodeURIComponent(redirect)}`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
