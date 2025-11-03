@@ -32,22 +32,14 @@ export function middleware(req: NextRequest) {
 
   // 1) 放行靜態 & Auth 回呼 & 登入頁
   if (
-    path.startsWith("/_next") ||
-    path.startsWith("/static") ||
-    path.startsWith("/favicon") ||
-    path.startsWith("/icon") ||
-    path.startsWith("/apple-touch-icon") ||
-    path.startsWith("/robots.txt") ||
-    path.startsWith("/sitemap.xml") ||
-    path.startsWith("/images") ||
-    path.startsWith("/fonts") ||
-    path.startsWith("/public") ||
-    path.startsWith("/auth/") ||          // 共用回呼
-    path.startsWith("/api/auth/") ||
-    path.startsWith("/edit/auth/") ||     // B 端專屬回呼
-    path.startsWith("/studio/auth/") ||   // A 端專屬回呼（若有）
-    path.startsWith("/studio/login") ||
-    path.startsWith("/edit/login")
+    path.startsWith("/_next") || path.startsWith("/static") ||
+    path.startsWith("/favicon") || path.startsWith("/icon") ||
+    path.startsWith("/apple-touch-icon") || path.startsWith("/robots.txt") ||
+    path.startsWith("/sitemap.xml") || path.startsWith("/images") ||
+    path.startsWith("/fonts") || path.startsWith("/public") ||
+    path.startsWith("/auth/") || path.startsWith("/api/auth/") ||
+    path.startsWith("/edit/auth/") || path.startsWith("/studio/auth/") ||
+    path.startsWith("/studio/login") || path.startsWith("/edit/login")
   ) {
     return withHostCookie(NextResponse.next(), hostname);
   }
