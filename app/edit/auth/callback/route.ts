@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 
-function safeRedirectEdit(req: NextRequest) {
+// 建議也放進環境變數
+const POSTER_ORIGIN = process.env.NEXT_PUBLIC_POSTER_ORIGIN ?? "https://poster.kingstalent.com.tw";
+
+function safeEditPath(req: NextRequest) {
   const url = new URL(req.url);
   const raw = url.searchParams.get("redirect");
   if (!raw) return "/edit";
   try {
-    const u = new URL(raw, url.origin);
-    if (u.origin !== url.origin) return "/edit";
+    const u = new URL(raw, POSTER_ORIGIN);   // ⬅️ 基準改成「B 端固定網域」
+    if (u.origin !== POSTER_ORIGIN) return "/edit";
     if (!u.pathname.startsWith("/edit")) return "/edit";
     return u.pathname + u.search + u.hash;
   } catch {
@@ -16,27 +19,30 @@ function safeRedirectEdit(req: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // 建立一個將被回傳的 response：同一個 response 會被寫入 Set-Cookie，再做 302
-  const redirectTo = safeRedirectEdit(request);
+  // 目標永遠落在 poster 網域
+  const path = safeEditPath(request);
+  const location = `${POSTER_ORIGIN}${path}`;
+
+  // 同一支 302 回應；Set-Cookie 會直接寫在這支 response
   const response = new NextResponse(null, { status: 302 });
-  response.headers.set("Location", new URL(redirectTo, request.url).toString());
+  response.headers.set("Location", location);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: (name: string) => request.cookies.get(name)?.value,
-        set: (name: string, value: string, options: CookieOptions) =>
-          response.cookies.set({ name, value, ...options }),
-        remove: (name: string, options: CookieOptions) =>
-          response.cookies.set({ name, value: "", ...options, expires: new Date(0) }),
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookies) => {
+          cookies.forEach(({ name, value, ...options }) => {
+            response.cookies.set(name, value ?? "", options as any);
+          });
+        },
       },
     }
   );
 
-  // 交換 code → session，Set-Cookie 直接寫到上面的 response
   await supabase.auth.exchangeCodeForSession(request.url);
 
-  return response; // 302 + Set-Cookie 同一支回應送出
+  return response; // 302 到 poster + 帶好 Set-Cookie
 }
