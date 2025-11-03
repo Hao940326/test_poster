@@ -1,65 +1,15 @@
-"use client";
+import { Suspense } from "react";
+import AuthCallbackClient from "./AuthCallbackClient";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { getSupabase } from "@/lib/supabaseClient";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+export const runtime = "nodejs";
 
-function safeRedirect(redirect: string | null): string {
-  if (!redirect) return "/";
-  try {
-    const u = new URL(redirect, window.location.origin);
-    // 只允許站內，且只允許 /studio 或 /edit 開頭
-    if (u.origin !== window.location.origin) return "/";
-    if (!u.pathname.startsWith("/studio") && !u.pathname.startsWith("/edit")) return "/";
-    return u.pathname + u.search + u.hash;
-  } catch {
-    return "/";
-  }
-}
-
-export default function AuthCallbackPage() {
-  const supabase = useMemo(() => getSupabase(), []);
-  const router = useRouter();
-  const sp = useSearchParams();
-  const [msg, setMsg] = useState("處理登入中…");
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const url = new URL(window.location.href);
-        const redirect = safeRedirect(sp.get("redirect"));
-
-        const code = url.searchParams.get("code");
-        const hasHashToken = url.hash.includes("access_token");
-
-        if (code) {
-          // ✅ exchangeCodeForSession 只吃字串 code
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
-        } else if (hasHashToken) {
-          const hash = new URLSearchParams(url.hash.slice(1));
-          const { data, error } = await supabase.auth.setSession({
-            access_token: String(hash.get("access_token")),
-            refresh_token: String(hash.get("refresh_token")),
-          });
-          if (error || !data.session) throw error || new Error("No session");
-        } else {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session) throw new Error("缺少授權資訊");
-        }
-
-        setMsg("登入成功，導向中…");
-        router.replace(redirect || "/");
-      } catch (e: any) {
-        console.error(e);
-        setMsg("登入失敗：" + (e?.message || "unknown"));
-      }
-    })();
-  }, [router, sp, supabase]);
-
+export default function Page() {
   return (
-    <div className="min-h-screen grid place-items-center">
-      <div className="text-slate-700">{msg}</div>
-    </div>
+    <Suspense fallback={<div className="min-h-screen grid place-items-center">處理登入中…</div>}>
+      <AuthCallbackClient />
+    </Suspense>
   );
 }

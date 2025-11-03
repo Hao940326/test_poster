@@ -5,14 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabaseClient";
 
 function safeRedirect(redirect: string | null): string {
-  if (!redirect) return "/";
+  if (!redirect) return "/edit";
   try {
     const u = new URL(redirect, window.location.origin);
-    if (u.origin !== window.location.origin) return "/";
-    if (!u.pathname.startsWith("/studio") && !u.pathname.startsWith("/edit")) return "/";
+    if (u.origin !== window.location.origin) return "/edit";
+    if (!u.pathname.startsWith("/edit")) return "/edit";
     return u.pathname + u.search + u.hash;
   } catch {
-    return "/";
+    return "/edit";
   }
 }
 
@@ -32,7 +32,6 @@ export default function AuthCallbackClient() {
         const hasHashToken = url.hash.includes("access_token");
 
         if (code) {
-          // ✅ 只傳字串 code
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
         } else if (hasHashToken) {
@@ -48,7 +47,7 @@ export default function AuthCallbackClient() {
         }
 
         setMsg("登入成功，導向中…");
-        router.replace(redirect || "/");
+        router.replace(redirect);
       } catch (e: any) {
         console.error(e);
         setMsg("登入失敗：" + (e?.message || "unknown"));
