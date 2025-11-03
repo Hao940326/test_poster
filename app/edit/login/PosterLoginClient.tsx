@@ -4,12 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabase } from "@/lib/supabaseClient";
 
+// ⬇️ 固定使用 Poster 的絕對網域（可用環境變數覆寫）
+const POSTER_ORIGIN =
+  process.env.NEXT_PUBLIC_POSTER_ORIGIN ?? "https://poster.kingstalent.com.tw";
+
 function safeRedirect(redirect: string | null) {
   if (!redirect) return "/edit";
   try {
-    if (typeof window === "undefined") return "/edit";
-    const u = new URL(redirect, window.location.origin);
-    if (u.origin !== window.location.origin) return "/edit";
+    // 以「poster 固定網域」作為基準，避免誤用到 studio origin
+    const u = new URL(redirect, POSTER_ORIGIN);
+    if (u.origin !== POSTER_ORIGIN) return "/edit";
     if (!u.pathname.startsWith("/edit")) return "/edit";
     return u.pathname + u.search + u.hash;
   } catch {
@@ -27,7 +31,9 @@ export default function PosterLoginPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) router.replace(redirect);
     })();
   }, [redirect, router, supabase]);
@@ -36,8 +42,10 @@ export default function PosterLoginPage() {
     try {
       setBusy(true);
 
-      // ✅ 改這裡：callback 指向 /edit/auth/callback
-      const cb = `${window.location.origin}/edit/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+      // ⬇️ 重點：callback 永遠指向 poster 網域
+      const cb = `${POSTER_ORIGIN}/edit/auth/callback?redirect=${encodeURIComponent(
+        redirect
+      )}`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
