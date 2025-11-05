@@ -1,73 +1,53 @@
-// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
-const STUDIO_HOST = "studio.kingstalent.com.tw";
-const POSTER_HOST = "poster.kingstalent.com.tw";
+const BASE = process.env.NEXT_PUBLIC_BASE_PREFIX || "/studio"; // /edit 或 /studio
 
-function withHostCookie(resp: NextResponse, hostname: string) {
-  const isPoster = hostname.includes("poster.");
-  const isStudio = hostname.includes("studio.");
-
-  if (isPoster) {
-    resp.cookies.set("sb-host", "poster", {
-      path: "/",
-      httpOnly: false,
-      sameSite: "lax",
-    });
-  } else if (isStudio) {
-    resp.cookies.set("sb-host", "studio", {
-      path: "/",
-      httpOnly: false,
-      sameSite: "lax",
-    });
-  }
-  return resp;
-}
-
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
-  const hostname = url.hostname;
-  const path = url.pathname;
+  const p = url.pathname;
 
-  // 1) 放行靜態 & Auth 回呼 & 登入頁
+  // 放行靜態/公開資源與 auth 回呼
   if (
-    path.startsWith("/_next") || path.startsWith("/static") ||
-    path.startsWith("/favicon") || path.startsWith("/icon") ||
-    path.startsWith("/apple-touch-icon") || path.startsWith("/robots.txt") ||
-    path.startsWith("/sitemap.xml") || path.startsWith("/images") ||
-    path.startsWith("/fonts") || path.startsWith("/public") ||
-    path.startsWith("/auth/") || path.startsWith("/api/auth/") ||
-    path.startsWith("/edit/auth/") || path.startsWith("/studio/auth/") ||
-    path.startsWith("/studio/login") || path.startsWith("/edit/login")
-  ) {
-    return withHostCookie(NextResponse.next(), hostname);
-  }
+    p.startsWith("/_next") || p.startsWith("/static") ||
+    p.startsWith("/favicon") || p.startsWith("/icon") ||
+    p.startsWith("/apple-touch-icon") || p.startsWith("/robots.txt") ||
+    p.startsWith("/sitemap.xml") || p.startsWith("/images") ||
+    p.startsWith("/fonts") || p.startsWith("/public") ||
+    p.startsWith("/auth/") || p.includes(".")
+  ) return NextResponse.next();
 
-  // 2) Studio 子網域 → 永遠掛 /studio
-  if (hostname === STUDIO_HOST || hostname.startsWith("studio.")) {
-    if (!path.startsWith("/studio")) {
-      url.pathname = "/studio" + (path === "/" ? "" : path);
-      return withHostCookie(NextResponse.rewrite(url), hostname);
+  // 不是正確前綴 → 導到 BASE
+  if (p === "/") { url.pathname = BASE; return NextResponse.redirect(url); }
+  if (!p.startsWith(BASE)) { url.pathname = BASE; return NextResponse.redirect(url); }
+
+  // 下面做「強制登入」
+  const res = NextResponse.next();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: (key) => req.cookies.get(key)?.value,
+        set: (key, value, options) => { res.cookies.set(key, value, options); },
+        remove: (key, options) => { res.cookies.delete(key); },
+      },
     }
-    return withHostCookie(NextResponse.next(), hostname);
+  );
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    const loginUrl = new URL(`${BASE}/login`, req.url);
+    loginUrl.searchParams.set("redirect", p + url.search + url.hash);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // 3) Poster 子網域 → 永遠掛 /edit
-  if (hostname === POSTER_HOST || hostname.startsWith("poster.")) {
-    if (!path.startsWith("/edit")) {
-      url.pathname = "/edit" + (path === "/" ? "" : path);
-      return withHostCookie(NextResponse.rewrite(url), hostname);
-    }
-    return withHostCookie(NextResponse.next(), hostname);
-  }
-
-  // 4) 其他網域（預覽/測試）
-  return withHostCookie(NextResponse.next(), hostname);
+  return res;
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|images/|fonts/|public/|icon|apple-touch-icon).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|images/|fonts/|public|icon|apple-touch-icon).*)",
   ],
 };
