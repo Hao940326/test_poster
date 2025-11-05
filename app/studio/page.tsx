@@ -1,6 +1,6 @@
 // app/studio/page.tsx
 import type { Metadata } from "next";
-import ClientStudio from "./ClientStudio";
+import ClientStudio from "./ClientStudio"; // ✅ 重點：沒有大括號
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -8,12 +8,6 @@ export const metadata: Metadata = {
   description: "A 端模板工作室",
 };
 
-import ErrorBoundary from "./ErrorBoundary";
-
 export default function Page() {
-  return (
-    <ErrorBoundary>
-      <ClientStudio />
-    </ErrorBoundary>
-  );
+  return <ClientStudio />; // ✅ 渲染 default 匯出的 React 函式
 }
