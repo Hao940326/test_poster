@@ -1,6 +1,5 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Head from "next/head";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
 import {
@@ -188,15 +187,6 @@ export default function StudioPage() {
   return (
     <>
       {/* Google Fonts（保留原本） */}
-      <Head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&family=Noto+Sans+TC:wght@300;400;500;700;900&family=Noto+Serif+TC:wght@300;400;600;700;900&family=Roboto:wght@300;400;500;700;900&display=swap"
-          rel="stylesheet"
-        />
-        {/* 🆕 預載入 GenYoGothic（至少預載一兩個常用字重） */}
-        <link rel="preload" as="font" href="/fonts/genyo/GenYoGothic-N.ttc" type="font/ttc" crossOrigin="anonymous" />
-        <link rel="preload" as="font" href="/fonts/genyo/GenYoGothic-B.ttc" type="font/ttc" crossOrigin="anonymous" />
-      </Head>
 
       {/* 🆕 全域註冊 GenYoGothic（請放好到 /public/fonts/genyo/） */}
       <style jsx global>{`
