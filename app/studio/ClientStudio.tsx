@@ -1,7 +1,9 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
 import { getSupabase } from "@/lib/supabaseClient";
+const supabase = getSupabaseBrowser("studio");
 import {
   TextLayer as BaseTextLayer, TemplateRow,
   listTemplates, upsertTemplate, getTemplateByName, deleteTemplateByName,
@@ -189,7 +191,7 @@ export default function StudioPage() {
       {/* Google Fonts（保留原本） */}
 
       {/* 🆕 全域註冊 GenYoGothic（請放好到 /public/fonts/genyo/） */}
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @font-face {
           font-family: 'GenYoGothicTW';
           src: url('/fonts/genyo/GenYoGothic-EL.ttc') format('truetype');
@@ -239,7 +241,7 @@ export default function StudioPage() {
           font-style: normal;
           font-display: swap;
         }
-      `}</style>
+      ` }} />
 
       <div className="p-4">
         <div className="mb-4 flex items-center justify-between">

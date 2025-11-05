@@ -1,20 +1,18 @@
-import { createClient } from "@supabase/supabase-js";
+// lib/supabaseBrowser.ts
+import { createBrowserClient } from "@supabase/ssr";
 
-let browserClient: ReturnType<typeof createClient> | null = null;
+export type AppRole = "studio" | "poster";
 
-export function getSupabaseBrowser() {
-  if (!browserClient) {
-    browserClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        },
-      }
-    );
-  }
-  return browserClient;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const storageKey = {
+  studio: "studio-auth",
+  poster: "poster-auth",
+} as const;
+
+export function getSupabaseBrowser(role: AppRole) {
+  return createBrowserClient(url, anon, {
+    auth: { storageKey: storageKey[role] }, // 彼此不覆蓋
+  });
 }
