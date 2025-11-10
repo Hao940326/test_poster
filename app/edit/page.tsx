@@ -37,8 +37,7 @@ type TemplateRowLite = {
 const placeholder =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
-const DEFAULT_LOGO =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAEYCAMAAADCuiwhAAAA8FBMVEX///9FGwr93ABBEwBCFQDt6edDFwBEGQY6AADY0M44AAD5+Pc+CgD8+/ptTkE8AABEDgD/+d3/5hH/4gD+8aSQenTm4N3//Oz//vn//vKzp6P+63r+75D+6Wry7+3/6jb/7lL+9Lj/+dExAABgPzXPxMAvAABXLx+7rag9CAB+Y1meioOtnZfe19TBtrFyVUopAACIb2Whj4ggAABWNCn+867++NL+8aCCaV9OJBJ5XVJZNyyTf3jKvrpKGwBlRTn95lL940D96GL+7If+7Hf/7D1VKxlcNCRZOTBjSkRQLSJsVE5OGgBKJRqTe3FwTkCBhotnAAATBElEQVR4nO1deX/SStsOZCMbia3EihqtkJI9JVYlQILLOWDbR/z+3+bNhC5AZibUZCjn/XH9cY7aFC7uuefeZ6Coajj7erb7w68qvlldeNE83/3Zb7s/SxTnzZOPOz764nuzueuz2RI+YQWfipfN5rcXOz35+t1ps/l+t2czzm92ffIvkJE+fb...";
+const DEFAULT_LOGO ="KTlogo.png";
 
 /** Logo 狀態：是否為預設 */
 type LogoState = { url: string | null; isDefault: boolean };
