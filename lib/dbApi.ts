@@ -34,10 +34,16 @@ export type TemplateRow = {
   updated_at: string;
 };
 
-/* ===================== 內部工具 ===================== */
+/* ===================== 旗標與常數 ===================== */
 const BUCKET = process.env.NEXT_PUBLIC_POSTER_BUCKET || "poster-assets";
 const IS_PUBLIC_BUCKET = String(process.env.NEXT_PUBLIC_POSTER_BUCKET_PUBLIC ?? "true") === "true";
 
+/** 是否停用 Poster 認證（前端/伺服端兩種旗標皆支援；前端僅能讀 NEXT_PUBLIC_*） */
+export const isPosterAuthDisabled =
+  process.env.NEXT_PUBLIC_DISABLE_AUTH_POSTER === "true" ||
+  process.env.DISABLE_AUTH_POSTER === "true";
+
+/* ===================== 內部工具 ===================== */
 function requireSb(): SupabaseClient {
   const sb = getSupabase();
   if (!sb) throw new Error("Supabase 尚未初始化。請確認 .env.local 並重啟 dev。");
@@ -78,9 +84,18 @@ export async function resolveBgUrl(path?: string | null): Promise<string> {
   return IS_PUBLIC_BUCKET ? toPublicUrl(path) : await toSignedUrl(path);
 }
 
-/* ===================== Auth：只允許 Google ===================== */
-/** 確認登入（只允許 Google；未登入則導向 OAuth，回來由 /auth/callback 交換 session） */
+/* ===================== Auth：只允許 Google（可選擇性停用） ===================== */
+/**
+ * 確認登入：
+ * - 若設置 DISABLE_AUTH_POSTER / NEXT_PUBLIC_DISABLE_AUTH_POSTER 為 true，回傳匿名使用者（不跳轉）
+ * - 否則：未登入時觸發 Google OAuth；回來由 /auth/callback 交換 session
+ */
 export async function ensureLogin() {
+  // 免登入模式（Poster）：直接給匿名使用者（配合 RLS/Policy 放行）
+  if (isPosterAuthDisabled) {
+    return { id: "anon-poster", email: "anon@poster.local" } as any;
+  }
+
   const sb = requireSb();
   const { data: { user } } = await sb.auth.getUser();
   if (user) return user;
@@ -135,7 +150,7 @@ export async function getTemplateByName(name: string): Promise<TemplateRow | nul
 
 /** 建立/更新模板：自動補上 owner（RLS 會再次驗證） */
 export async function upsertTemplate(row: any) {
-  const sb = getSupabase();
+  const sb = requireSb();
   const { data, error } = await sb
     .from("talent_templates")
     .upsert(row, { onConflict: "id" })  // ✅ 關鍵：以 id 為主鍵覆蓋
@@ -144,7 +159,6 @@ export async function upsertTemplate(row: any) {
   if (error) throw error;
   return data;
 }
-
 
 /** 依名稱刪除（僅刪自己的；RLS 也會擋） */
 export async function deleteTemplateByName(name: string) {
@@ -163,7 +177,14 @@ export async function deleteTemplateByName(name: string) {
 }
 
 /* ===================== Storage：背景圖 ===================== */
-/** 上傳背景圖到 Storage，回傳儲存路徑；會依使用者分隔資料夾 */
+/**
+ * 上傳背景圖到 Storage，回傳儲存路徑；會依使用者分隔資料夾
+ * 🔒 注意：這支函式仍然需要登入（因為要用 user.id 作為路徑）。
+ * 若你要在 Poster 免登入時也能上傳，請另外：
+ *  1) 規劃匿名上傳的資料夾（如 posters/anon/<token>/...）
+ *  2) 在 Supabase Storage Policy 允許 anon 對該前綴 INSERT
+ *  3) 依免登入情境改造本函式（我可以再幫你寫一個 anon 版本）
+ */
 export async function uploadBgDataUrl(templateId: string, dataUrl: string) {
   const sb = requireSb();
 
