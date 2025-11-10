@@ -119,8 +119,14 @@ export default function BPage() {
   const supabase = useMemo<SupabaseClient>(() => getSupabase(), []);
   const router = useRouter();
 
-  // ✅ 登入守門機制
+  // ✅ 登入守門機制（Poster 免登入可跳過）
   useEffect(() => {
+    const disabled = process.env.NEXT_PUBLIC_DISABLE_AUTH_POSTER === "true";
+    if (disabled) {
+      console.log("[Poster] Auth disabled → skip login guard");
+      return;
+    }
+
     let canceled = false;
     (async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -129,7 +135,7 @@ export default function BPage() {
       const session = data?.session;
       if (!session || error) {
         const redirect = encodeURIComponent(
-          window.location.pathname + window.location.search || "/edit"
+          (window.location.pathname + window.location.search) || "/edit"
         );
         router.replace(`/edit/login?redirect=${redirect}`);
       }
@@ -198,17 +204,6 @@ export default function BPage() {
     const p = t.bg_path;
     if (!p) return placeholder;
     return /^https?:|^data:image\//.test(p) ? p : toPublicUrl(encodeURI(p));
-  }
-
-  function selectTemplate(t: TemplateRowLite) {
-    setPicked(t);
-
-    const init: Record<string, string> = {};
-    for (const L of t.text_layers) init[L.id] = L.text;
-    setValues(init);
-
-    // ✅ 選模板時只移除「預設 Logo」，若已是客戶 Logo 就保留
-    setLogo((prev) => (prev.isDefault ? { url: null, isDefault: false } : prev));
   }
 
   function setFieldForLabel(match: RegExp, text: string) {
@@ -289,7 +284,53 @@ export default function BPage() {
     window.addEventListener("touchcancel", onTouchEnd, { passive: false });
   };
 
-  /* --------- 同系列模板切換 --------- */
+  /* --------- ✅ 切換模板會保留使用者輸入 --------- */
+  function selectTemplate(nextTpl: TemplateRowLite) {
+    // 1) 存下右側四個欄位目前值（依標籤正則）
+    const currentForm: Partial<Record<typeof FIELD_KEYS[number]["key"], string>> = {};
+    for (const { key } of FIELD_KEYS) {
+      currentForm[key] = getFieldValue(key) || "";
+    }
+
+    // 2) 存下「被使用者修改過」的文字層（以 label 為 key）
+    const lastByLabel = new Map<string, string>();
+    if (picked) {
+      for (const L of picked.text_layers) {
+        const v = values[L.id];
+        if (v !== undefined && v !== L.text) {
+          lastByLabel.set((L.label || "").trim(), v);
+        }
+      }
+    }
+
+    // 3) 生成新模板的初始 values
+    //    優先順序：
+    //    A) 相同 label → 用 lastByLabel
+    //    B) 符合四欄位 regex → 用 currentForm
+    //    C) 其他 → 用新模板 L.text
+    const init: Record<string, string> = {};
+    for (const L of nextTpl.text_layers) {
+      const exact = lastByLabel.get((L.label || "").trim());
+      if (exact != null) {
+        init[L.id] = exact;
+        continue;
+      }
+      const field = FIELD_KEYS.find((f) => f.match.test(L.label));
+      if (field) {
+        init[L.id] = (currentForm[field.key] ?? "") || L.text;
+        continue;
+      }
+      init[L.id] = L.text;
+    }
+
+    setPicked(nextTpl);
+    setValues(init);
+
+    // Logo 規則：仍維持—只有當前是預設 Logo 才在換模板時清掉
+    setLogo((prev) => (prev.isDefault ? { url: null, isDefault: false } : prev));
+  }
+
+  /* --------- 同系列模板切換（按名稱基底 + 尾碼排序） --------- */
   const siblings = React.useMemo(() => {
     if (!picked) return [] as TemplateRowLite[];
     const bn = baseName(picked.name);
@@ -515,7 +556,7 @@ export default function BPage() {
                   {siblings.map((tpl) => (
                     <button
                       key={tpl.id}
-                      onClick={() => setPicked(tpl)}
+                      onClick={() => selectTemplate(tpl)}
                       className={`w-14 h-16 rounded-xl shadow border overflow-hidden ${
                         picked?.id === tpl.id ? "ring-2 ring-black" : ""
                       }`}
@@ -651,7 +692,7 @@ export default function BPage() {
                                   picked?.id === t.id
                                     ? "ring-2 ring-slate-900"
                                     : ""
-                                } icon-tile`}  // 👈 保證白底黑字
+                                } icon-tile`}
                                 title={baseName(t.name)}
                               >
                                 <img
@@ -679,28 +720,28 @@ export default function BPage() {
                 輸入資訊
               </span>
 
-            <div className="mt-4 space-y-3">
-              {FIELD_KEYS.map(({ key, match, label }) => (
-                <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <label className="w-full sm:w-32 text-sm text-slate-700">{label}</label>
-                  <input
-                    className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
-                    placeholder="請輸入…"
-                    value={
-                      picked
-                        ? (() => {
-                            const hit = picked.text_layers.find((l) =>
-                              match.test(l.label)
-                            );
-                            return hit ? values[hit.id] ?? "" : "";
-                          })()
-                        : ""
-                    }
-                    onChange={(e) => setFieldForLabel(match, e.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
+              <div className="mt-4 space-y-3">
+                {FIELD_KEYS.map(({ key, match, label }) => (
+                  <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <label className="w-full sm:w-32 text-sm text-slate-700">{label}</label>
+                    <input
+                      className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
+                      placeholder="請輸入…"
+                      value={
+                        picked
+                          ? (() => {
+                              const hit = picked.text_layers.find((l) =>
+                                match.test(l.label)
+                              );
+                              return hit ? values[hit.id] ?? "" : "";
+                            })()
+                          : ""
+                      }
+                      onChange={(e) => setFieldForLabel(match, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* 下載：PNG / PDF */}

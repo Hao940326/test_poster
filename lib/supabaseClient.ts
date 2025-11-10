@@ -4,44 +4,48 @@ import { getSupabaseBrowser } from "./supabaseBrowser";
 
 export type AppRole = "studio" | "poster";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-const cookieName = {
-  studio: { name: "sb-studio", at: "sb-studio-at", rt: "sb-studio-rt" },
-  poster: { name: "sb-poster", at: "sb-poster-at", rt: "sb-poster-rt" },
+/** 各分區使用不同 cookie 前綴，會話完全隔離 */
+const PREFIX = {
+  studio: "sb-studio",
+  poster: "sb-poster",
 } as const;
 
-const base: CookieOptions = { path: "/", httpOnly: true, sameSite: "lax", secure: true };
+const BASE_COOKIE: CookieOptions = {
+  path: "/",
+  httpOnly: true,
+  sameSite: "lax",
+  secure: true,
+};
 
-/** Next 15 相容：用函式簽章把 cookies 交給 @supabase/ssr 管 */
+/** ✅ Server 專用：RSC / route handlers 都用這個 */
 export async function getSupabaseServer(role: AppRole) {
-  // next/headers 只能在 server context 使用；為避免在模組載入時引用造成 client build 錯誤，
-  // 在函式內動態 import 並回傳一個取得 cookies 的函式。
+  // dynamic import to avoid importing `next/headers` at module top-level
   const getStore = async () => {
     const mod = await import("next/headers");
     return mod.cookies();
   };
 
-  return createServerClient(url, anon, {
-    // 這裡可以設定 cookie 前綴名稱（新版型別允許）
-    cookieOptions: { name: cookieName[role].name, ...base },
-    // types: Supabase's typings expect a different cookies shape; cast to any to satisfy TS for now
-    cookies: getStore as any, // ✅ 新版簽章：() => Promise<ReadonlyRequestCookies>
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON, {
+    cookieOptions: { name: PREFIX[role], ...BASE_COOKIE },
+    // cast to any to satisfy Supabase typings for the experimental cookie methods
+    cookies: getStore as any,
   });
 }
 
-/** 產生各自的 OAuth callback URL */
-export function getOAuthCallback(role: AppRole, origin: string) {
-  const path = role === "studio" ? "/studio/auth/callback" : "/edit/auth/callback";
-  return `${origin}${path}`;
-}
-
 /**
- * 兼容舊代碼：在 client-side 提供 getSupabase() 工廠，回傳預設 role 的 browser client
- * 其它檔案習慣直接 import { getSupabase } from './supabaseClient'
+ * Compatibility helper for client-side code that expected `getSupabase()`.
+ * Returns a browser client using the default role 'studio'.
  */
 export function getSupabase() {
-  // 預設回傳 studio 的 browser client；若需要 poster，可直接呼叫 getSupabaseBrowser("poster")
   return getSupabaseBrowser("studio");
+}
+
+/** 產生 OAuth callback（避免 undefined / 重複斜線） */
+export function getOAuthCallback(role: AppRole, origin: string) {
+  const base = (origin || "").replace(/\/+$/, ""); // 去掉結尾斜線
+  const path = role === "studio" ? "/studio/auth/callback" : "/edit/auth/callback";
+  return `${base}${path}`;
 }
