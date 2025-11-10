@@ -37,7 +37,7 @@ type TemplateRowLite = {
 const placeholder =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
-const DEFAULT_LOGO ="KTlogo.png";
+const DEFAULT_LOGO ="/KTlogo.png";
 
 /** Logo 狀態：是否為預設 */
 type LogoState = { url: string | null; isDefault: boolean };
