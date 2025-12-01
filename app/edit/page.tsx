@@ -1,10 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  CSSProperties,
+} from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabaseClient";
 import { listTemplates, toPublicUrl } from "@/lib/dbApi";
-import { useRouter } from "next/navigation"; // ✅ 專用 app router
+import { useRouter } from "next/navigation";
 
 /* ---------------- Types ---------------- */
 type TextLayer = {
@@ -33,11 +39,21 @@ type TemplateRowLite = {
   text_layers: TextLayer[];
 };
 
+/* 右側輸入欄位 key */
+type FieldKey = "school" | "date" | "phone" | "addr";
+
+type FieldKeyConfig = {
+  key: FieldKey;
+  match: RegExp;
+  label: string;
+  multiline?: boolean;
+};
+
 /* ---------------- Utils & Constants ---------------- */
 const placeholder =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
-const DEFAULT_LOGO ="/KTlogo.png";
+const DEFAULT_LOGO = "/KTlogo.png";
 
 /** Logo 狀態：是否為預設 */
 type LogoState = { url: string | null; isDefault: boolean };
@@ -69,18 +85,36 @@ function tailNumber(s: string) {
   return m ? parseInt(m[1], 10) : -1;
 }
 
-const FIELD_KEYS = [
-  { key: "school", match: /補習班|機構|班名|店名|名稱/i, label: "補習班名稱：" },
-  { key: "date", match: /日期|time|day|時段/i, label: "課程日期：" },
-  { key: "phone", match: /專線|電話|phone|聯絡/i, label: "報名專線：" },
-  { key: "addr", match: /地址|地點|address|上課地點/i, label: "上課地址：" },
-] as const;
+/** 右側輸入欄位設定 */
+const FIELD_KEYS: FieldKeyConfig[] = [
+  {
+    key: "school",
+    match: /補習班|機構|班名|店名|名稱/i,
+    label: "補習班名稱：",
+    multiline: true, // ✅ 補習班名稱用 textarea，可手動換行
+  },
+  {
+    key: "date",
+    match: /日期|time|day|時段/i,
+    label: "課程日期：",
+  },
+  {
+    key: "phone",
+    match: /專線|電話|phone|聯絡/i,
+    label: "報名專線：",
+  },
+  {
+    key: "addr",
+    match: /地址|地點|address|上課地點/i,
+    label: "上課地址：",
+  },
+];
 
 const CATEGORY_STYLES: Record<string, { dot: string; pill: string }> = {
-  "創意手作": { dot: "bg-[#F2A7AF]", pill: "bg-[#F2A7AF] text-white" },
-  "益智挑戰": { dot: "bg-[#EFAB67]", pill: "bg-[#EFAB67] text-white" },
-  "STEAM啟航": { dot: "bg-[#799DBF]", pill: "bg-[#799DBF] text-white" },
-  "律動節奏": { dot: "bg-[#D389C2]", pill: "bg-[#D389C2] text-white" },
+  創意手作: { dot: "bg-[#F2A7AF]", pill: "bg-[#F2A7AF] text-white" },
+  益智挑戰: { dot: "bg-[#EFAB67]", pill: "bg-[#EFAB67] text-white" },
+  STEAM啟航: { dot: "bg-[#799DBF]", pill: "bg-[#799DBF] text-white" },
+  律動節奏: { dot: "bg-[#D389C2]", pill: "bg-[#D389C2] text-white" },
   其他: { dot: "bg-slate-300", pill: "bg-slate-500 text-white" },
 };
 
@@ -151,8 +185,8 @@ export default function BPage() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
-  const previewWrapOuterRef = useRef<HTMLDivElement>(null);
-  const stageWrapRef = useRef<HTMLDivElement>(null);
+  const previewWrapOuterRef = useRef<HTMLDivElement | null>(null);
+  const stageWrapRef = useRef<HTMLDivElement | null>(null);
   const [wrapWidth, setWrapWidth] = useState<number>(0);
   const [logo, setLogo] = useState<LogoState>({ url: null, isDefault: false });
   const [logoPos, setLogoPos] = useState({ x: 0, y: 0, size: 300 });
@@ -212,9 +246,10 @@ export default function BPage() {
     setValues((o) => ({ ...o, [hit.id]: text }));
   }
 
-  function getFieldValue(fieldKey: typeof FIELD_KEYS[number]["key"]) {
+  function getFieldValue(fieldKey: FieldKey) {
     if (!picked) return "";
-    const conf = FIELD_KEYS.find((f) => f.key === fieldKey)!;
+    const conf = FIELD_KEYS.find((f) => f.key === fieldKey);
+    if (!conf) return "";
     const hit = picked.text_layers.find((l) => conf.match.test(l.label));
     return hit ? values[hit.id] ?? "" : "";
   }
@@ -286,7 +321,7 @@ export default function BPage() {
   /* --------- ✅ 切換模板會保留使用者輸入 --------- */
   function selectTemplate(nextTpl: TemplateRowLite) {
     // 1) 存下右側四個欄位目前值（依標籤正則）
-    const currentForm: Partial<Record<typeof FIELD_KEYS[number]["key"], string>> = {};
+    const currentForm: Partial<Record<FieldKey, string>> = {};
     for (const { key } of FIELD_KEYS) {
       currentForm[key] = getFieldValue(key) || "";
     }
@@ -303,10 +338,6 @@ export default function BPage() {
     }
 
     // 3) 生成新模板的初始 values
-    //    優先順序：
-    //    A) 相同 label → 用 lastByLabel
-    //    B) 符合四欄位 regex → 用 currentForm
-    //    C) 其他 → 用新模板 L.text
     const init: Record<string, string> = {};
     for (const L of nextTpl.text_layers) {
       const exact = lastByLabel.get((L.label || "").trim());
@@ -326,7 +357,9 @@ export default function BPage() {
     setValues(init);
 
     // Logo 規則：仍維持—只有當前是預設 Logo 才在換模板時清掉
-    setLogo((prev) => (prev.isDefault ? { url: null, isDefault: false } : prev));
+    setLogo((prev) =>
+      prev.isDefault ? { url: null, isDefault: false } : prev
+    );
   }
 
   /* --------- 同系列模板切換（按名稱基底 + 尾碼排序） --------- */
@@ -361,7 +394,6 @@ export default function BPage() {
 
   /* ---------------- 匯出：PNG / PDF ---------------- */
   async function getStageCanvas(scaleFactor = 3) {
-    // ✅ 先等字體載入，避免 html2canvas fallback 到預設字體
     if ((document as any).fonts?.ready) {
       await (document as any).fonts.ready;
     }
@@ -388,7 +420,6 @@ export default function BPage() {
           cloned.style.transformOrigin = "top left";
           cloned.style.width = `${w}px`;
           cloned.style.height = `${h}px`;
-          // ✅ 再保險一次：強制字體
           cloned.style.fontFamily = `"GenYoGothicTW","Noto Sans TC",sans-serif`;
         }
       },
@@ -443,9 +474,10 @@ export default function BPage() {
 
   /* ---------------- Render ---------------- */
   return (
-    // ✅ 這裡加上 data-b-side，讓白底規則只在 B 端生效
-    <div data-b-side className="min-h-screen flex flex-col bg-white font-[GenYoGothicTW]">
-      {/* ✅ 主要內容包在 flex-1 的 <main> 中 */}
+    <div
+      data-b-side
+      className="min-h-screen flex flex-col bg-white font-[GenYoGothicTW]"
+    >
       <main className="flex-1">
         <div className="max-w-[1180px] mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
           {/* 左：預覽區 */}
@@ -477,36 +509,87 @@ export default function BPage() {
                       : "none",
                     backgroundSize: "cover",
                     backgroundPosition: "center",
-                    // ✅ 強制字體（畫布內）
                     fontFamily: `"GenYoGothicTW","Noto Sans TC",sans-serif`,
                   }}
                 >
-                  {/* 文字層：選了模板才顯示 */}
+                  {/* 文字層 */}
                   {picked &&
-                    picked.text_layers.map((L) => (
-                      <div
-                        key={L.id}
-                        className="absolute select-none px-1"
-                        style={{
-                          left: L.x,
-                          top: L.y,
-                          width: Math.max(1, L.width),
-                          color: L.color,
-                          fontSize: L.fontSize,
-                          fontWeight: L.weight,
-                          fontStyle: L.italic ? "italic" : "normal",
-                          textAlign: L.align as any,
-                          textTransform: L.uppercase ? "uppercase" : "none",
-                          textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
-                          lineHeight: 1.1,
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                          zIndex: 10,
-                        }}
-                      >
-                        {values[L.id] !== undefined ? values[L.id] : L.text}
-                      </div>
-                    ))}
+                    picked.text_layers.map((L) => {
+                      const text =
+                        values[L.id] !== undefined ? values[L.id] : L.text;
+
+                      // ✅ 判斷是否為「補習班名稱」文字層
+                      const isSchoolLayer =
+                        /補習班|機構|班名|店名|名稱/i.test(L.label);
+
+                      // 行高與字型大小基準
+                      const baseFontSize = L.fontSize;
+                      let renderFontSize = baseFontSize;
+                      let lineHeight = 1.1;
+
+                      const style: CSSProperties = {
+                        position: "absolute",
+                        left: L.x,
+                        top: L.y,
+                        width: Math.max(1, L.width),
+                        color: L.color,
+                        fontWeight: L.weight,
+                        fontStyle: L.italic ? "italic" : "normal",
+                        textAlign: L.align as any,
+                        textTransform: L.uppercase ? "uppercase" : "none",
+                        textShadow: L.shadow
+                          ? "0 2px 6px rgba(0,0,0,.35)"
+                          : "none",
+                        zIndex: 10,
+                      };
+
+                      if (isSchoolLayer) {
+                        // ✅ 只依照使用者手動換行（\n）來斷行
+                        style.whiteSpace = "pre";
+                        style.wordBreak = "keep-all";
+
+                        // ✅ 根據手動行數縮小字型
+                        const raw = (text ?? "").toString();
+                        const lines = raw
+                          .split(/\r?\n/)
+                          .filter((l) => l.trim() !== "");
+                        const lineCount = Math.max(lines.length, 1);
+                        const maxLines = 3; // 最多給 3 行高度
+
+                        const clamped = Math.min(lineCount, maxLines);
+                        // 1 行：100%，2 行：88%，3 行：78%，再多就大約 1/行數
+                        const scaleMap: Record<number, number> = {
+                          1: 1,
+                          2: 0.75,
+                          3: 0.60
+                        };
+                        const scale =
+                          scaleMap[clamped] ?? Math.max(0.6, 1 / clamped);
+
+                        renderFontSize = Math.round(baseFontSize * scale);
+                        lineHeight = 1.1;
+
+                        style.maxHeight = renderFontSize * lineHeight * maxLines;
+                        style.overflow = "hidden";
+                      } else {
+                        // 其他層維持原本換行行為
+                        style.whiteSpace = "pre-wrap";
+                        style.wordBreak = "break-word";
+                      }
+
+                      style.fontSize = renderFontSize;
+                      style.lineHeight = lineHeight;
+
+                      return (
+                        <div
+                          key={L.id}
+                          className="absolute select-none px-1"
+                          style={style}
+                        >
+                          {text}
+                        </div>
+                      );
+                    })}
 
                   {/* Logo：預設不可拖曳/不可點；客戶 Logo 可拖曳 */}
                   {logo.url && (
@@ -545,7 +628,7 @@ export default function BPage() {
               </div>
             </div>
 
-            {/* 左下：同系列模板（未選模板不顯示） */}
+            {/* 左下：同系列模板 */}
             {picked && siblings.length > 0 && (
               <div className="mt-6">
                 <div className="text-[13px] mb-2 font-semibold text-slate-700">
@@ -563,7 +646,9 @@ export default function BPage() {
                     >
                       <img
                         src={getThumbFromBg(tpl)}
-                        onError={(e) => (e.currentTarget.src = placeholder)}
+                        onError={(e) =>
+                          (e.currentTarget.src = placeholder)
+                        }
                         className="w-full h-full object-cover"
                         alt={tpl.name}
                         draggable={false}
@@ -574,7 +659,7 @@ export default function BPage() {
               </div>
             )}
 
-            {/* 上傳 / 控制 Logo（預設時禁用控制） */}
+            {/* 上傳 / 控制 Logo */}
             <div className="mt-6">
               <div className="text-[13px] mb-2 font-semibold text-slate-700">
                 上傳LOGO
@@ -590,11 +675,18 @@ export default function BPage() {
                     if (!file) return;
                     const reader = new FileReader();
                     reader.onload = () => {
-                      setLogo({ url: reader.result as string, isDefault: false });
+                      setLogo({
+                        url: reader.result as string,
+                        isDefault: false,
+                      });
                       const W = picked?.width ?? 1080;
                       const H = picked?.height ?? 1528;
                       const S = 300;
-                      setLogoPos({ x: (W - S) / 2, y: (H - S) / 2, size: S });
+                      setLogoPos({
+                        x: (W - S) / 2,
+                        y: (H - S) / 2,
+                        size: S,
+                      });
                     };
                     reader.readAsDataURL(file);
                   }}
@@ -603,7 +695,7 @@ export default function BPage() {
 
               {logo.url && (
                 <div className="mt-3 space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items中心 gap-2">
                     <label className="text-sm">大小：</label>
                     <input
                       type="range"
@@ -612,7 +704,10 @@ export default function BPage() {
                       value={logoPos.size}
                       disabled={logo.isDefault}
                       onChange={(e) =>
-                        setLogoPos((o) => ({ ...o, size: +e.target.value }))
+                        setLogoPos((o) => ({
+                          ...o,
+                          size: +e.target.value,
+                        }))
                       }
                       className="w-full sm:w-64"
                     />
@@ -624,25 +719,51 @@ export default function BPage() {
                     <span className="text-sm">位置：</span>
                     <div className="flex gap-2">
                       {[
-                        { k: "up", fn: () => setLogoPos((o) => ({ ...o, y: o.y - 1 })) },
-                        { k: "down", fn: () => setLogoPos((o) => ({ ...o, y: o.y + 1 })) },
-                        { k: "left", fn: () => setLogoPos((o) => ({ ...o, x: o.x - 1 })) },
-                        { k: "right", fn: () => setLogoPos((o) => ({ ...o, x: o.x + 1 })) },
+                        {
+                          k: "up",
+                          fn: () =>
+                            setLogoPos((o) => ({ ...o, y: o.y - 1 })),
+                        },
+                        {
+                          k: "down",
+                          fn: () =>
+                            setLogoPos((o) => ({ ...o, y: o.y + 1 })),
+                        },
+                        {
+                          k: "left",
+                          fn: () =>
+                            setLogoPos((o) => ({ ...o, x: o.x - 1 })),
+                        },
+                        {
+                          k: "right",
+                          fn: () =>
+                            setLogoPos((o) => ({ ...o, x: o.x + 1 })),
+                        },
                       ].map(({ k, fn }) => (
                         <button
                           key={k}
                           onClick={!logo.isDefault ? fn : undefined}
                           disabled={logo.isDefault}
                           className={`px-2 py-1 border rounded ${
-                            logo.isDefault ? "opacity-50 cursor-not-allowed" : ""
+                            logo.isDefault
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
                           }`}
                         >
-                          {k === "up" ? "↑" : k === "down" ? "↓" : k === "left" ? "←" : "→"}
+                          {k === "up"
+                            ? "↑"
+                            : k === "down"
+                            ? "↓"
+                            : k === "left"
+                            ? "←"
+                            : "→"}
                         </button>
                       ))}
                     </div>
                     <button
-                      onClick={() => setLogo({ url: null, isDefault: false })} // 真的清空
+                      onClick={() =>
+                        setLogo({ url: null, isDefault: false })
+                      }
                       className="ml-0 sm:ml-3 px-3 py-1.5 rounded-lg bg-red-500 text-white text-sm shadow hover:bg-red-600 active:scale-95"
                     >
                       刪除 Logo
@@ -666,7 +787,8 @@ export default function BPage() {
                 ) : (
                   grouped.map((grp) => {
                     const s =
-                      CATEGORY_STYLES[grp.name] ?? CATEGORY_STYLES["其他"];
+                      CATEGORY_STYLES[grp.name] ??
+                      CATEGORY_STYLES["其他"];
                     return (
                       <div key={grp.name}>
                         <div className="flex items-center gap-2 mb-2">
@@ -697,7 +819,7 @@ export default function BPage() {
                                 <img
                                   src={iconUrl}
                                   onError={(e) =>
-                                    ((e.currentTarget.src = placeholder))
+                                    (e.currentTarget.src = placeholder)
                                   }
                                   className="w-[56px] h-[56px] object-contain"
                                   alt={baseName(t.name)}
@@ -720,24 +842,59 @@ export default function BPage() {
               </span>
 
               <div className="mt-4 space-y-3">
-                {FIELD_KEYS.map(({ key, match, label }) => (
-                  <div key={key} className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <label className="w-full sm:w-32 text-sm text-slate-700">{label}</label>
-                    <input
-                      className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
-                      placeholder="請輸入…"
-                      value={
-                        picked
-                          ? (() => {
-                              const hit = picked.text_layers.find((l) =>
-                                match.test(l.label)
-                              );
-                              return hit ? values[hit.id] ?? "" : "";
-                            })()
-                          : ""
-                      }
-                      onChange={(e) => setFieldForLabel(match, e.target.value)}
-                    />
+                {FIELD_KEYS.map(({ key, match, label, multiline }) => (
+                  <div
+                    key={key}
+                    className="flex flex-wrap items-center gap-2 sm:gap-3"
+                  >
+                    <label className="w-full sm:w-32 text-sm text-slate-700">
+                      {label}
+                    </label>
+
+                    {multiline ? (
+                      <div className="flex-1 min-w-0">
+                        <textarea
+                          className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none min-h-[72px]"
+                          placeholder="請輸入…（可按 Enter 換行）"
+                          value={
+                            picked
+                              ? (() => {
+                                  const hit =
+                                    picked.text_layers.find((l) =>
+                                      match.test(l.label)
+                                    );
+                                  return hit ? values[hit.id] ?? "" : "";
+                                })()
+                              : ""
+                          }
+                          onChange={(e) =>
+                            setFieldForLabel(match, e.target.value)
+                          }
+                        />
+                        <p className="mt-1 text-xs text-slate-500">
+                          按 Enter 決定換行位置，海報會依行數自動縮小字型，最多約三行高度。
+                        </p>
+                      </div>
+                    ) : (
+                      <input
+                        className="min-w-0 flex-1 w-full sm:w-auto px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none"
+                        placeholder="請輸入…"
+                        value={
+                          picked
+                            ? (() => {
+                                const hit =
+                                  picked.text_layers.find((l) =>
+                                    match.test(l.label)
+                                  );
+                                return hit ? values[hit.id] ?? "" : "";
+                              })()
+                            : ""
+                        }
+                        onChange={(e) =>
+                          setFieldForLabel(match, e.target.value)
+                        }
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -750,9 +907,16 @@ export default function BPage() {
                 className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
               >
                 下載 PNG 圖檔
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M12 4v10" />
                   <path d="M8 10l4 4 4-4" />
                   <path d="M4 20h16" />
@@ -764,9 +928,16 @@ export default function BPage() {
                 className="px-6 py-3 rounded-full bg-slate-900 text-white font-semibold shadow active:scale-95 transition inline-flex items-center gap-2"
               >
                 下載 PDF 列印
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5"
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M12 4v10" />
                   <path d="M8 10l4 4 4-4" />
                   <path d="M4 20h16" />
@@ -777,7 +948,6 @@ export default function BPage() {
         </div>
       </main>
 
-      {/* ✅ footer 會自然貼齊底部 */}
       <footer className="mt-10 bg-[#FFC840] text-[11px] sm:text-[12px] text-white/90 py-3 text-center tracking-wider px-3">
         國王才藝 KING'S TALENT ｜本平台模板由國王才藝原創設計，僅限補教機構之招生宣傳使用，請勿轉售、重製或作商業用途。
       </footer>
