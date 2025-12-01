@@ -896,7 +896,7 @@ export default function BPage() {
                       <div className="flex-1 min-w-0">
                         <textarea
                           className="w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-slate-900/30 outline-none min-h-[72px]"
-                          placeholder="請輸入…（可按 Enter 換行）"
+                          placeholder="請輸入…"
                           value={
                             picked
                               ? (() => {
@@ -912,9 +912,6 @@ export default function BPage() {
                             setFieldForLabel(match, e.target.value)
                           }
                         />
-                        <p className="mt-1 text-xs text-slate-500">
-                          按 Enter 決定換行位置，下方文字會自動往下移。
-                        </p>
                       </div>
                     ) : (
                       <input
