@@ -320,13 +320,11 @@ export default function BPage() {
 
   /* --------- ✅ 切換模板會保留使用者輸入 --------- */
   function selectTemplate(nextTpl: TemplateRowLite) {
-    // 1) 存下右側四個欄位目前值（依標籤正則）
     const currentForm: Partial<Record<FieldKey, string>> = {};
     for (const { key } of FIELD_KEYS) {
       currentForm[key] = getFieldValue(key) || "";
     }
 
-    // 2) 存下「被使用者修改過」的文字層（以 label 為 key）
     const lastByLabel = new Map<string, string>();
     if (picked) {
       for (const L of picked.text_layers) {
@@ -337,7 +335,6 @@ export default function BPage() {
       }
     }
 
-    // 3) 生成新模板的初始 values
     const init: Record<string, string> = {};
     for (const L of nextTpl.text_layers) {
       const exact = lastByLabel.get((L.label || "").trim());
@@ -356,7 +353,6 @@ export default function BPage() {
     setPicked(nextTpl);
     setValues(init);
 
-    // Logo 規則：仍維持—只有當前是預設 Logo 才在換模板時清掉
     setLogo((prev) =>
       prev.isDefault ? { url: null, isDefault: false } : prev
     );
@@ -512,73 +508,115 @@ export default function BPage() {
                     fontFamily: `"GenYoGothicTW","Noto Sans TC",sans-serif`,
                   }}
                 >
-                  {/* 文字層 */}
-                  {picked &&
-                    picked.text_layers.map((L) => {
-                      const text =
-                        values[L.id] !== undefined ? values[L.id] : L.text;
+                  {/* 先計算補習班名稱多出來的高度 */}
+                  {(() => {
+                    if (!picked) return null;
 
-                      // ✅ 判斷是否為「補習班名稱」文字層
-                      const isSchoolLayer =
-                        /補習班|機構|班名|店名|名稱/i.test(L.label);
+                    const schoolMatch = /補習班|機構|班名|店名|名稱/i;
+                    const schoolLayer = picked.text_layers.find((l) =>
+                      schoolMatch.test(l.label)
+                    );
 
-                      // 行高與字型大小基準
-                      const baseFontSize = L.fontSize;
-                      let renderFontSize = baseFontSize;
-                      let lineHeight = 1.1;
+                    // 你可以在這裡細調「每個行數要縮多少」
+                    const SCALE_BY_LINES: Record<number, number> = {
+                      1: 1.0,   // 1 行 = 100%
+                      2: 0.95,  // 2 行 = 95%
+                      3: 0.85,   // 3 行 = 90%
+                      4: 0.80,  // 4 行 = 85%
+                      5: 0.75,   // 5 行 = 80%
+                    };
+                    const MIN_SCALE = 0.7;   // 最小不要小於 70%，你也可以改
 
-                      const style: CSSProperties = {
+                    let schoolExtraY = 0;
+                    let schoolY = 0;
+
+                    if (schoolLayer) {
+                      const rawText =
+                        values[schoolLayer.id] !== undefined
+                          ? values[schoolLayer.id]
+                          : schoolLayer.text;
+
+                      const lines = rawText
+                        .split(/\r?\n/)
+                        .map((l) => (l === "" ? " " : l)).length;
+
+                      const baseFont = schoolLayer.fontSize;
+                      const lineHeight = 1.1;
+
+                      // 依行數取出你設定的縮放倍率，沒有設定就沿用最後一筆
+                      let scale =
+                        SCALE_BY_LINES[lines] ??
+                        SCALE_BY_LINES[
+                          Math.max(
+                            ...Object.keys(SCALE_BY_LINES).map((k) => parseInt(k, 10))
+                          )
+                        ];
+                      scale = Math.max(scale, MIN_SCALE);
+
+                      const newFontSize = baseFont * scale;
+                      const newHeight = newFontSize * lineHeight * lines;
+                      const baseHeight = baseFont * lineHeight;
+                      const extraHeight = Math.max(0, newHeight - baseHeight);
+
+                      schoolExtraY = extraHeight;
+                      schoolY = schoolLayer.y;
+                    }
+
+                    // === 真正 render 所有文字層 ===
+                    return picked.text_layers.map((L) => {
+                      const text = values[L.id] !== undefined ? values[L.id] : L.text;
+                      const isSchoolLayer = schoolMatch.test(L.label);
+
+                      // 1) 先算位置（要不要往下推）
+                      let top = L.y;
+                      if (!isSchoolLayer && schoolLayer && L.y > schoolY) {
+                        top = L.y + schoolExtraY;
+                      }
+
+                      const style: React.CSSProperties = {
                         position: "absolute",
                         left: L.x,
-                        top: L.y,
+                        top,
                         width: Math.max(1, L.width),
                         color: L.color,
                         fontWeight: L.weight,
                         fontStyle: L.italic ? "italic" : "normal",
                         textAlign: L.align as any,
                         textTransform: L.uppercase ? "uppercase" : "none",
-                        textShadow: L.shadow
-                          ? "0 2px 6px rgba(0,0,0,.35)"
-                          : "none",
+                        textShadow: L.shadow ? "0 2px 6px rgba(0,0,0,.35)" : "none",
                         zIndex: 10,
                       };
 
                       if (isSchoolLayer) {
-                        // ✅ 只依照使用者手動換行（\n）來斷行
-                        style.whiteSpace = "pre";
-                        style.wordBreak = "keep-all";
+                        // === 補習班名稱：依行數縮字 + 只吃手動換行 ===
+                        const rawText =
+                          values[L.id] !== undefined ? values[L.id] : L.text;
+                        const lines = rawText.split(/\r?\n/).length;
+                        const baseFont = L.fontSize;
+                        const lineHeight = 1.1;
 
-                        // ✅ 根據手動行數縮小字型
-                        const raw = (text ?? "").toString();
-                        const lines = raw
-                          .split(/\r?\n/)
-                          .filter((l) => l.trim() !== "");
-                        const lineCount = Math.max(lines.length, 1);
-                        const maxLines = 3; // 最多給 3 行高度
+                        let scale =
+                          SCALE_BY_LINES[lines] ??
+                          SCALE_BY_LINES[
+                            Math.max(
+                              ...Object.keys(SCALE_BY_LINES).map((k) => parseInt(k, 10))
+                            )
+                          ];
+                        scale = Math.max(scale, MIN_SCALE);
 
-                        const clamped = Math.min(lineCount, maxLines);
-                        // 1 行：100%，2 行：88%，3 行：78%，再多就大約 1/行數
-                        const scaleMap: Record<number, number> = {
-                          1: 1,
-                          2: 0.75,
-                          3: 0.60
-                        };
-                        const scale =
-                          scaleMap[clamped] ?? Math.max(0.6, 1 / clamped);
+                        const newFontSize = baseFont * scale;
 
-                        renderFontSize = Math.round(baseFontSize * scale);
-                        lineHeight = 1.1;
-
-                        style.maxHeight = renderFontSize * lineHeight * maxLines;
-                        style.overflow = "hidden";
+                        style.fontSize = newFontSize;
+                        style.lineHeight = lineHeight;
+                        style.whiteSpace = "pre";     // 只根據 \n 換行
+                        style.wordBreak = "keep-all"; // 不自動拆字
                       } else {
-                        // 其他層維持原本換行行為
+                        // 其他文字維持原本設定
+                        style.fontSize = L.fontSize;
+                        style.lineHeight = 1.1;
                         style.whiteSpace = "pre-wrap";
                         style.wordBreak = "break-word";
                       }
-
-                      style.fontSize = renderFontSize;
-                      style.lineHeight = lineHeight;
 
                       return (
                         <div
@@ -589,7 +627,10 @@ export default function BPage() {
                           {text}
                         </div>
                       );
-                    })}
+                    });
+                  })()}
+
+
 
                   {/* Logo：預設不可拖曳/不可點；客戶 Logo 可拖曳 */}
                   {logo.url && (
@@ -695,7 +736,7 @@ export default function BPage() {
 
               {logo.url && (
                 <div className="mt-3 space-y-3">
-                  <div className="flex flex-wrap items中心 gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <label className="text-sm">大小：</label>
                     <input
                       type="range"
@@ -872,7 +913,7 @@ export default function BPage() {
                           }
                         />
                         <p className="mt-1 text-xs text-slate-500">
-                          按 Enter 決定換行位置，海報會依行數自動縮小字型，最多約三行高度。
+                          按 Enter 決定換行位置，下方文字會自動往下移。
                         </p>
                       </div>
                     ) : (
